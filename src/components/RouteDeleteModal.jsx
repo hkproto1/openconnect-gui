@@ -15,7 +15,7 @@ function RouteDeleteModal({ route, onConfirm, onCancel }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!password) {
-      setError('Password is required');
+      setError('请输入密码');
       return;
     }
 
@@ -50,9 +50,9 @@ function RouteDeleteModal({ route, onConfirm, onCancel }) {
             <AlertTriangle className="h-6 w-6 text-destructive" />
           </div>
           <div className="flex-1">
-            <h2 className="text-lg font-semibold">Delete Route</h2>
+            <h2 className="text-lg font-semibold">删除路由</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              This will delete the following route from your system
+              此操作将从系统中删除以下路由
             </p>
           </div>
         </div>
@@ -64,7 +64,7 @@ function RouteDeleteModal({ route, onConfirm, onCancel }) {
             <span>{route.gateway}</span>
           </div>
           <div className="text-xs text-muted-foreground mt-1">
-            via {route.interface}
+            经由 {route.interface}
           </div>
         </div>
 
@@ -72,12 +72,12 @@ function RouteDeleteModal({ route, onConfirm, onCancel }) {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 text-muted-foreground" />
-              <Label htmlFor="sudo-password">Administrator Password</Label>
+              <Label htmlFor="sudo-password">管理员密码</Label>
             </div>
             <Input
               type="password"
               id="sudo-password"
-              placeholder="Enter your password"
+              placeholder="请输入密码"
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
@@ -90,16 +90,16 @@ function RouteDeleteModal({ route, onConfirm, onCancel }) {
               <p className="text-sm text-destructive">{error}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Administrator privileges are required to modify network routes
+              修改系统路由需要管理员权限
             </p>
           </div>
 
           <div className="flex gap-3 justify-end">
             <Button type="button" variant="outline" onClick={handleCancel} disabled={isDeleting}>
-              Cancel
+              取消
             </Button>
             <Button type="submit" variant="destructive" disabled={isDeleting}>
-              {isDeleting ? 'Deleting...' : 'Delete Route'}
+              {isDeleting ? '正在删除…' : '删除路由'}
             </Button>
           </div>
         </form>

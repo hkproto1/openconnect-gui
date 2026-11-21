@@ -78,11 +78,11 @@ function ConnectionForm({
 
   const handleConnect = async () => {
     if (!formData.serverUrl || !formData.username || !formData.password) {
-      showAlert('Please fill in all required fields', 'error');
+      showAlert('请填写所有必填项', 'error');
       return;
     }
 
-    addLog('Attempting to connect...', 'info');
+    addLog('正在尝试连接…', 'info');
 
     const config = {
       server: formData.serverUrl.trim(),
@@ -96,30 +96,30 @@ function ConnectionForm({
     const result = await window.electronAPI.connectVPN(config);
 
     if (!result.success) {
-      showAlert(`Connection failed: ${result.error}`, 'error');
-      addLog(`Connection failed: ${result.error}`, 'error');
+      showAlert(`连接失败：${result.error}`, 'error');
+      addLog(`连接失败：${result.error}`, 'error');
     } else {
-      addLog('Connection initiated...', 'info');
+      addLog('已发起连接…', 'info');
     }
   };
 
   const handleDisconnect = async () => {
-    addLog('Disconnecting...', 'info');
+    addLog('正在断开连接…', 'info');
     const result = await window.electronAPI.disconnectVPN();
 
     if (!result.success) {
-      showAlert(`Disconnect failed: ${result.error}`, 'error');
+      showAlert(`断开连接失败：${result.error}`, 'error');
     }
   };
 
   const handleSaveProfile = async () => {
     if (!formData.profileName) {
-      showAlert('Please enter a profile name', 'error');
+      showAlert('请输入配置名称', 'error');
       return;
     }
 
     if (!formData.serverUrl || !formData.username) {
-      showAlert('Please fill in server and username', 'error');
+      showAlert('请填写服务器地址和用户名', 'error');
       return;
     }
 
@@ -140,22 +140,22 @@ function ConnectionForm({
       // Update existing
       newProfiles = [...profiles];
       newProfiles[existingIndex] = profile;
-      showAlert(`Profile "${formData.profileName}" updated`, 'success');
+      showAlert(`配置「${formData.profileName}」已更新`, 'success');
     } else {
       // Add new
       newProfiles = [...profiles, profile];
-      showAlert(`Profile "${formData.profileName}" saved`, 'success');
+      showAlert(`配置「${formData.profileName}」已保存`, 'success');
     }
 
     setProfiles(newProfiles);
     await saveProfiles(newProfiles);
-    addLog(`Profile "${formData.profileName}" saved`, 'info');
+    addLog(`配置「${formData.profileName}」已保存`, 'info');
   };
 
   const handleDeleteProfile = async () => {
     if (!selectedProfile) return;
 
-    if (window.confirm(`Delete profile "${selectedProfile}"?`)) {
+    if (window.confirm(`确定要删除配置「${selectedProfile}」吗？`)) {
       const newProfiles = profiles.filter(p => p.name !== selectedProfile);
       setProfiles(newProfiles);
       await saveProfiles(newProfiles);
@@ -172,8 +172,8 @@ function ConnectionForm({
         serverCert: ''
       });
 
-      showAlert(`Profile "${selectedProfile}" deleted`, 'success');
-      addLog(`Profile "${selectedProfile}" deleted`, 'info');
+      showAlert(`配置「${selectedProfile}」已删除`, 'success');
+      addLog(`配置「${selectedProfile}」已删除`, 'info');
     }
   };
 
@@ -186,20 +186,20 @@ function ConnectionForm({
       <CardHeader>
         <div className="flex items-center gap-2">
           <Settings className="h-5 w-5" />
-          <CardTitle>Connection Settings</CardTitle>
+          <CardTitle>连接设置</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Profile Selection */}
         <div className="space-y-2">
-          <Label htmlFor="profileSelect">Saved Profiles</Label>
+          <Label htmlFor="profileSelect">已保存的配置</Label>
           <div className="flex gap-2">
             <Select value={selectedProfile} onValueChange={handleProfileSelect}>
               <SelectTrigger className="flex-1">
-                <SelectValue placeholder="-- New Connection --" />
+                <SelectValue placeholder="-- 新建连接 --" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__new__">-- New Connection --</SelectItem>
+                <SelectItem value="__new__">-- 新建连接 --</SelectItem>
                 {profiles.map(profile => (
                   <SelectItem key={profile.name} value={profile.name}>
                     {profile.name}
@@ -210,7 +210,7 @@ function ConnectionForm({
             <Button
               variant="outline"
               size="icon"
-              title="Delete Profile"
+              title="删除配置"
               disabled={!selectedProfile || selectedProfile === '__new__'}
               onClick={handleDeleteProfile}
             >
@@ -222,19 +222,19 @@ function ConnectionForm({
         {/* Connection Form */}
         <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="profileName">Profile Name (optional)</Label>
+            <Label htmlFor="profileName">配置名称（可选）</Label>
             <Input
               type="text"
               id="profileName"
               name="profileName"
-              placeholder="My VPN Connection"
+              placeholder="我的 VPN 连接"
               value={formData.profileName}
               onChange={handleInputChange}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="serverUrl">VPN Server URL *</Label>
+            <Label htmlFor="serverUrl">VPN 服务器地址 *</Label>
             <Input
               type="text"
               id="serverUrl"
@@ -247,12 +247,12 @@ function ConnectionForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="username">Username *</Label>
+            <Label htmlFor="username">用户名 *</Label>
             <Input
               type="text"
               id="username"
               name="username"
-              placeholder="username"
+              placeholder="用户名"
               required
               value={formData.username}
               onChange={handleInputChange}
@@ -260,21 +260,21 @@ function ConnectionForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password *</Label>
+            <Label htmlFor="password">密码 *</Label>
             <Input
               type="password"
               id="password"
               name="password"
-              placeholder="password"
+              placeholder="密码"
               required
               value={formData.password}
               onChange={handleInputChange}
             />
-            <p className="text-xs text-muted-foreground">⚠️ Warning: Password is stored in plaintext locally</p>
+            <p className="text-xs text-muted-foreground">⚠️ 注意：密码会以明文形式保存在本地</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="authgroup">Group/Authgroup (optional)</Label>
+            <Label htmlFor="authgroup">组 / 认证组（可选）</Label>
             <Input
               type="text"
               id="authgroup"
@@ -286,26 +286,26 @@ function ConnectionForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="protocol">Protocol</Label>
+            <Label htmlFor="protocol">协议</Label>
             <Select value={formData.protocol} onValueChange={(value) => setFormData(prev => ({ ...prev, protocol: value }))}>
               <SelectTrigger id="protocol">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="anyconnect">AnyConnect (Cisco)</SelectItem>
+                <SelectItem value="anyconnect">AnyConnect（Cisco）</SelectItem>
                 <SelectItem value="nc">Juniper Network Connect</SelectItem>
-                <SelectItem value="gp">GlobalProtect (Palo Alto)</SelectItem>
+                <SelectItem value="gp">GlobalProtect（Palo Alto）</SelectItem>
                 <SelectItem value="pulse">Pulse Connect Secure</SelectItem>
                 <SelectItem value="f5">F5 Big-IP</SelectItem>
                 <SelectItem value="fortinet">Fortinet</SelectItem>
                 <SelectItem value="array">Array Networks</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">Select the VPN protocol your server uses</p>
+            <p className="text-xs text-muted-foreground">选择服务器使用的 VPN 协议</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="serverCert">Server Certificate (optional)</Label>
+            <Label htmlFor="serverCert">服务器证书（可选）</Label>
             <Input
               type="text"
               id="serverCert"
@@ -314,7 +314,7 @@ function ConnectionForm({
               value={formData.serverCert}
               onChange={handleInputChange}
             />
-            <p className="text-xs text-muted-foreground">Example: pin-sha256:AAAA1111BBB2222CCC3333DDD4444EEE5555FFF6666=</p>
+            <p className="text-xs text-muted-foreground">示例：pin-sha256:AAAA1111BBB2222CCC3333DDD4444EEE5555FFF6666=</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -323,7 +323,7 @@ function ConnectionForm({
               disabled={!openConnectInstalled || !isDisconnected}
               onClick={handleConnect}
             >
-              Connect
+              连接
             </Button>
             <Button
               type="button"
@@ -331,14 +331,14 @@ function ConnectionForm({
               disabled={isDisconnected}
               onClick={handleDisconnect}
             >
-              Disconnect
+              断开连接
             </Button>
             <Button
               type="button"
               variant="secondary"
               onClick={handleSaveProfile}
             >
-              Save Profile
+              保存配置
             </Button>
           </div>
         </form>

@@ -6,27 +6,27 @@
 set -e
 
 echo "=========================================="
-echo "OpenConnect Standalone Installer"
+echo "OpenConnect 独立安装脚本"
 echo "=========================================="
 echo ""
 
 # Check if running on macOS
 if [[ "$OSTYPE" != "darwin"* ]]; then
-    echo "❌ This script is designed for macOS only"
+    echo "❌ 本脚本仅支持 macOS"
     exit 1
 fi
 
 # Check for required build tools
 if ! command -v gcc &> /dev/null && ! command -v clang &> /dev/null; then
-    echo "❌ No C compiler found"
+    echo "❌ 未检测到 C 编译器"
     echo ""
-    echo "Please install Xcode Command Line Tools first:"
+    echo "请先安装 Xcode 命令行工具："
     echo "  xcode-select --install"
     echo ""
     exit 1
 fi
 
-echo "✅ Build tools found"
+echo "✅ 已检测到构建工具"
 echo ""
 
 # Set installation directory
@@ -34,7 +34,7 @@ INSTALL_DIR="$HOME/.local/openconnect"
 BIN_DIR="$INSTALL_DIR/bin"
 TEMP_DIR="/tmp/openconnect-build"
 
-echo "Installation directory: $INSTALL_DIR"
+echo "安装目录：$INSTALL_DIR"
 echo ""
 
 # Create directories
@@ -47,8 +47,8 @@ GNUTLS_VERSION="3.8.3"
 NETTLE_VERSION="3.9.1"
 GMP_VERSION="6.3.0"
 
-echo "⏳ Downloading and building dependencies..."
-echo "This may take 15-30 minutes depending on your system."
+echo "⏳ 正在下载并编译依赖…"
+echo "根据机器性能，可能需要 15-30 分钟。"
 echo ""
 
 cd "$TEMP_DIR"
@@ -59,10 +59,10 @@ download_and_extract() {
     local filename=$(basename "$url")
     local dirname=${filename%.tar.*}
 
-    echo "📥 Downloading $filename..."
+    echo "📥 正在下载 $filename…"
     curl -LO "$url" || wget "$url"
 
-    echo "📦 Extracting $filename..."
+    echo "📦 正在解压 $filename…"
     tar -xf "$filename"
 
     echo "$dirname"
@@ -71,7 +71,7 @@ download_and_extract() {
 # Build GMP (required by Nettle)
 if [ ! -f "$INSTALL_DIR/lib/libgmp.dylib" ]; then
     echo ""
-    echo "Building GMP..."
+    echo "正在编译 GMP…"
     dirname=$(download_and_extract "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_VERSION.tar.xz")
     cd "$dirname"
     ./configure --prefix="$INSTALL_DIR" --enable-shared
@@ -83,7 +83,7 @@ fi
 # Build Nettle (required by GnuTLS)
 if [ ! -f "$INSTALL_DIR/lib/libnettle.dylib" ]; then
     echo ""
-    echo "Building Nettle..."
+    echo "正在编译 Nettle…"
     dirname=$(download_and_extract "https://ftp.gnu.org/gnu/nettle/nettle-$NETTLE_VERSION.tar.gz")
     cd "$dirname"
     PKG_CONFIG_PATH="$INSTALL_DIR/lib/pkgconfig" \
@@ -96,7 +96,7 @@ fi
 # Build GnuTLS
 if [ ! -f "$INSTALL_DIR/lib/libgnutls.dylib" ]; then
     echo ""
-    echo "Building GnuTLS..."
+    echo "正在编译 GnuTLS…"
     dirname=$(download_and_extract "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-$GNUTLS_VERSION.tar.xz")
     cd "$dirname"
     PKG_CONFIG_PATH="$INSTALL_DIR/lib/pkgconfig" \
@@ -108,7 +108,7 @@ fi
 
 # Build OpenConnect
 echo ""
-echo "Building OpenConnect..."
+echo "正在编译 OpenConnect…"
 dirname=$(download_and_extract "https://www.infradead.org/openconnect/download/openconnect-$OPENCONNECT_VERSION.tar.gz")
 cd "$dirname"
 
@@ -122,30 +122,30 @@ make install
 
 # Download vpnc-script
 echo ""
-echo "📥 Downloading vpnc-script..."
+echo "📥 正在下载 vpnc-script…"
 curl -L "https://gitlab.com/openconnect/vpnc-scripts/-/raw/master/vpnc-script" -o "$INSTALL_DIR/bin/vpnc-script"
 chmod +x "$INSTALL_DIR/bin/vpnc-script"
 
 # Clean up
 echo ""
-echo "🧹 Cleaning up..."
+echo "🧹 正在清理临时文件…"
 rm -rf "$TEMP_DIR"
 
 # Update PATH instructions
 echo ""
 echo "=========================================="
-echo "✅ Installation Complete!"
+echo "✅ 安装完成！"
 echo "=========================================="
 echo ""
-echo "OpenConnect has been installed to:"
+echo "OpenConnect 已安装到："
 echo "  $BIN_DIR/openconnect"
 echo ""
-echo "To use it, add this to your shell configuration:"
+echo "如需使用，请将下面这行加入你的 shell 配置："
 echo "  export PATH=\"$BIN_DIR:\$PATH\""
 echo ""
-echo "Or create a symlink (requires sudo):"
+echo "或创建软链接（需要 sudo）："
 echo "  sudo ln -s $BIN_DIR/openconnect /usr/local/bin/openconnect"
 echo "  sudo ln -s $INSTALL_DIR/bin/vpnc-script /usr/local/bin/vpnc-script"
 echo ""
-echo "Restart the OpenConnect VPN GUI application to use the installed binary."
+echo "重启 OpenConnect VPN GUI 应用即可使用已安装的程序。"
 echo ""

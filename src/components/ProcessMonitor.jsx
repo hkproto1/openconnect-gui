@@ -60,7 +60,7 @@ function ProcessMonitor({ onProcessCountChange }) {
       setProcessToKill(null);
       return { success: true };
     } else if (result.incorrectPassword) {
-      return { success: false, error: 'Incorrect password. Please try again.' };
+      return { success: false, error: '密码错误，请重试。' };
     } else {
       setProcessToKill(null);
       setError(result.error);
@@ -78,16 +78,16 @@ function ProcessMonitor({ onProcessCountChange }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ListChecks className="h-5 w-5" />
-            <CardTitle>Running OpenConnect Processes</CardTitle>
+            <CardTitle>运行中的 OpenConnect 进程</CardTitle>
             {processes.length > 0 && (
               <Badge variant="default" className="ml-2">
-                {processes.length} Active
+                {processes.length} 个运行中
               </Badge>
             )}
           </div>
           <Button variant="outline" size="sm" onClick={checkProcesses} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            刷新
           </Button>
         </div>
       </CardHeader>
@@ -96,22 +96,22 @@ function ProcessMonitor({ onProcessCountChange }) {
         <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <h3 className="font-semibold text-blue-900 dark:text-blue-100 text-sm">About Process Monitor</h3>
+            <h3 className="font-semibold text-blue-900 dark:text-blue-100 text-sm">关于进程监控</h3>
           </div>
           <div className="text-xs text-blue-800 dark:text-blue-200 space-y-2">
             <p>
-              This tool scans your system for running OpenConnect VPN processes, including those started outside this application.
+              该工具会扫描系统中正在运行的 OpenConnect VPN 进程，包括不是由本应用启动的进程。
             </p>
             <div className="mt-2">
-              <p className="font-medium mb-1">What it shows:</p>
+              <p className="font-medium mb-1">可查看的内容：</p>
               <ul className="list-disc list-inside space-y-0.5 ml-2">
-                <li>All active OpenConnect processes on your system</li>
-                <li>Processes started manually via terminal or other tools</li>
-                <li>Connections managed by this app (when active)</li>
+                <li>系统中所有活动的 OpenConnect 进程</li>
+                <li>通过终端或其他工具手动启动的进程</li>
+                <li>由本应用管理的连接（运行中时）</li>
               </ul>
             </div>
             <p className="mt-2">
-              <strong>Note:</strong> If you see processes here but aren't connected through this app, they were likely started manually or by another application. Use the Connection tab to manage VPN connections through this GUI.
+              <strong>说明：</strong>如果这里出现进程但你并未通过本应用连接，它们多半是手动启动或其他应用启动的。请通过「连接」页签管理本应用的 VPN 连接。
             </p>
           </div>
         </div>
@@ -126,15 +126,15 @@ function ProcessMonitor({ onProcessCountChange }) {
         {!error && processes.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             <ListChecks className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p className="text-sm">No running OpenConnect processes found</p>
-            <p className="text-xs mt-1">Active VPN connections will appear here</p>
+            <p className="text-sm">未发现运行中的 OpenConnect 进程</p>
+            <p className="text-xs mt-1">活动的 VPN 连接会显示在这里</p>
           </div>
         )}
 
         {processes.length > 0 && (
           <div className="space-y-3">
             <div className="text-sm text-muted-foreground">
-              Found {processes.length} running OpenConnect {processes.length === 1 ? 'process' : 'processes'}:
+              发现 {processes.length} 个运行中的 OpenConnect 进程：
             </div>
             {processes.map((process, idx) => (
               <div key={idx} className="bg-muted p-3 rounded font-mono text-xs flex items-start gap-3">
@@ -146,13 +146,13 @@ function ProcessMonitor({ onProcessCountChange }) {
                   className="flex-shrink-0"
                 >
                   <XCircle className="h-3 w-3 mr-1" />
-                  Kill
+                  结束进程
                 </Button>
               </div>
             ))}
             <div className="bg-amber-500/10 border border-amber-500/20 rounded p-3">
               <p className="text-sm text-amber-900 dark:text-amber-200">
-                <strong>Note:</strong> These processes are running independently. Use the Connection tab to manage VPN connections through this app.
+                <strong>说明：</strong>这些进程独立运行。请通过「连接」页签管理本应用的 VPN 连接。
               </p>
             </div>
           </div>

@@ -3,10 +3,10 @@ import { Badge } from './ui/badge';
 
 function Navigation({ currentView, onViewChange, problematicRoutesCount, runningProcessesCount }) {
   const navItems = [
-    { id: 'connection', label: 'Connection', icon: Network },
-    { id: 'logs', label: 'Logs', icon: ScrollText },
-    { id: 'diagnostics', label: 'Diagnostics', icon: Activity, badge: problematicRoutesCount },
-    { id: 'processes', label: 'Processes', icon: ListChecks, badge: runningProcessesCount },
+    { id: 'connection', label: '连接', icon: Network },
+    { id: 'logs', label: '日志', icon: ScrollText },
+    { id: 'diagnostics', label: '网络诊断', icon: Activity, badge: problematicRoutesCount },
+    { id: 'processes', label: '进程', icon: ListChecks, badge: runningProcessesCount },
   ];
 
   return (

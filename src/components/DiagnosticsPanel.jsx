@@ -30,7 +30,7 @@ function DiagnosticsPanel({ showAlert, addLog, serverUrl, onProblematicRoutesCha
         const routesList = routesResult.routes || [];
         setRoutes(routesList);
       } else {
-        addLog(`Failed to get routes: ${routesResult.error}`, 'error');
+        addLog(`获取路由表失败：${routesResult.error}`, 'error');
       }
 
       // Get network interfaces
@@ -49,7 +49,7 @@ function DiagnosticsPanel({ showAlert, addLog, serverUrl, onProblematicRoutesCha
         }
       }
     } catch (error) {
-      addLog(`Diagnostics error: ${error.message}`, 'error');
+      addLog(`诊断出错：${error.message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -116,22 +116,22 @@ function DiagnosticsPanel({ showAlert, addLog, serverUrl, onProblematicRoutesCha
     if (!routeToDelete) return null;
 
     const destination = routeToDelete.destination;
-    addLog(`Attempting to delete route to ${destination}...`, 'info');
+    addLog(`正在尝试删除到 ${destination} 的路由…`, 'info');
 
     const result = await window.electronAPI.deleteRoute(destination, password);
 
     if (result.success) {
-      showAlert(`Route deleted successfully`, 'success');
-      addLog(`Route to ${destination} deleted`, 'info');
+      showAlert(`路由删除成功`, 'success');
+      addLog(`已删除到 ${destination} 的路由`, 'info');
       refreshDiagnostics();
       setRouteToDelete(null);
       return { success: true };
     } else if (result.incorrectPassword) {
-      addLog(`Incorrect sudo password`, 'error');
-      return { success: false, error: 'Incorrect password. Please try again.' };
+      addLog(`sudo 密码错误`, 'error');
+      return { success: false, error: '密码错误，请重试。' };
     } else {
-      showAlert(`Failed to delete route: ${result.error}`, 'error');
-      addLog(`Failed to delete route: ${result.error}`, 'error');
+      showAlert(`删除路由失败：${result.error}`, 'error');
+      addLog(`删除路由失败：${result.error}`, 'error');
       setRouteToDelete(null);
       return { success: false, error: result.error };
     }
@@ -157,16 +157,16 @@ function DiagnosticsPanel({ showAlert, addLog, serverUrl, onProblematicRoutesCha
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Network className="h-5 w-5" />
-              <CardTitle>Network Diagnostics</CardTitle>
+              <CardTitle>网络诊断</CardTitle>
               {problematicRoutes.length > 0 && (
                 <Badge variant="destructive" className="ml-2">
-                  {problematicRoutes.length} Issue{problematicRoutes.length !== 1 ? 's' : ''}
+                  {problematicRoutes.length} 个问题
                 </Badge>
               )}
             </div>
             <Button variant="outline" size="sm" onClick={refreshDiagnostics} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
+              刷新
             </Button>
           </div>
         </CardHeader>
@@ -175,23 +175,23 @@ function DiagnosticsPanel({ showAlert, addLog, serverUrl, onProblematicRoutesCha
         <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <h3 className="font-semibold text-blue-900 dark:text-blue-100 text-sm">About Network Diagnostics</h3>
+            <h3 className="font-semibold text-blue-900 dark:text-blue-100 text-sm">关于网络诊断</h3>
           </div>
           <div className="text-xs text-blue-800 dark:text-blue-200 space-y-2">
             <p>
-              This tool helps diagnose and fix network issues that may prevent VPN connections. It provides insights into your system's network configuration.
+              该工具用于诊断并修复可能影响 VPN 连接的网络问题，帮助你了解系统当前的网络配置。
             </p>
             <div className="mt-3">
-              <p className="font-medium mb-1">What to look for:</p>
+              <p className="font-medium mb-1">重点关注：</p>
               <ul className="list-disc list-inside space-y-1 ml-2">
-                <li><strong>Problematic Routes:</strong> Stale network routes pointing to unreachable gateways (often from previous network connections or VPNs)</li>
-                <li><strong>Connectivity Test:</strong> Check if your VPN server is reachable from your current network</li>
-                <li><strong>Network Interfaces:</strong> View active network interfaces and their IP addresses</li>
+                <li><strong>异常路由：</strong>指向不可达网关的残留路由（通常来自之前连接过的网络或 VPN）</li>
+                <li><strong>连通性测试：</strong>检查当前网络能否访问 VPN 服务器</li>
+                <li><strong>网络接口：</strong>查看活动网络接口及其 IP 地址</li>
               </ul>
             </div>
             <p className="mt-3">
-              <strong>Common Issue:</strong> If you see a route with gateway like <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">172.20.10.1</code> but you're not on that network anymore,
-              it's likely blocking your VPN connection. Click <strong>Delete</strong> to remove it.
+              <strong>常见问题：</strong>如果看到网关类似 <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">172.20.10.1</code> 的路由，而你已经不在该网络下，
+              它很可能正在阻塞 VPN 连接，点击<strong>删除</strong>即可移除。
             </p>
           </div>
         </div>
@@ -204,11 +204,11 @@ function DiagnosticsPanel({ showAlert, addLog, serverUrl, onProblematicRoutesCha
               ) : (
                 <XCircle className="h-4 w-4 text-red-500" />
               )}
-              VPN Server Connectivity
+              VPN 服务器连通性
             </h3>
             <div className="text-sm bg-muted p-3 rounded">
-              <div><span className="font-medium">Host:</span> {connectivity.host}:{connectivity.port}</div>
-              <div><span className="font-medium">Status:</span> {connectivity.reachable ? 'Reachable ✓' : 'Unreachable ✗'}</div>
+              <div><span className="font-medium">主机：</span> {connectivity.host}:{connectivity.port}</div>
+              <div><span className="font-medium">状态：</span> {connectivity.reachable ? '可达 ✓' : '不可达 ✗'}</div>
               {connectivity.message && (
                 <div className="mt-2 text-xs text-muted-foreground">{connectivity.message}</div>
               )}
@@ -218,7 +218,7 @@ function DiagnosticsPanel({ showAlert, addLog, serverUrl, onProblematicRoutesCha
 
         {/* Network Interfaces */}
         <div>
-          <h3 className="font-semibold mb-2">Active Network Interfaces</h3>
+          <h3 className="font-semibold mb-2">活动网络接口</h3>
           <div className="space-y-2">
             {interfaces.filter(i => i.ip).map((iface) => (
               <div key={iface.name} className="text-sm bg-muted p-2 rounded flex justify-between items-center">
@@ -228,7 +228,7 @@ function DiagnosticsPanel({ showAlert, addLog, serverUrl, onProblematicRoutesCha
                   <span className="font-mono">{iface.ip}</span>
                 </div>
                 <Badge variant={iface.status === 'active' ? 'default' : 'outline'} className="text-xs">
-                  {iface.status}
+                  {iface.status === 'active' ? '启用' : iface.status}
                 </Badge>
               </div>
             ))}
@@ -240,7 +240,7 @@ function DiagnosticsPanel({ showAlert, addLog, serverUrl, onProblematicRoutesCha
           <div>
             <h3 className="font-semibold mb-2 flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-4 w-4" />
-              Problematic Routes Detected
+              检测到异常路由
             </h3>
             <div className="space-y-2">
               {problematicRoutes.map((route, idx) => (
@@ -251,10 +251,10 @@ function DiagnosticsPanel({ showAlert, addLog, serverUrl, onProblematicRoutesCha
                         <span className="font-semibold">{route.destination}</span>
                         <span className="mx-2">→</span>
                         <span>{route.gateway}</span>
-                        <span className="mx-2 text-muted-foreground">via {route.interface}</span>
+                        <span className="mx-2 text-muted-foreground">经由 {route.interface}</span>
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        This route points to a gateway that may not be reachable on your current network.
+                        该路由指向的网关在当前网络中可能不可达。
                       </div>
                     </div>
                     <Button
@@ -264,29 +264,29 @@ function DiagnosticsPanel({ showAlert, addLog, serverUrl, onProblematicRoutesCha
                       className="ml-4"
                     >
                       <Trash2 className="h-3 w-3 mr-1" />
-                      Delete
+                      删除
                     </Button>
                   </div>
                 </div>
               ))}
             </div>
             <div className="mt-3 text-sm text-muted-foreground">
-              <p>💡 <strong>Tip:</strong> Stale routes can prevent VPN connections. Delete problematic routes to fix connectivity issues.</p>
+              <p>💡 <strong>提示：</strong>残留路由会阻塞 VPN 连接，删除异常路由可修复连通性问题。</p>
             </div>
           </div>
         )}
 
         {/* All Routes */}
         <div>
-          <h3 className="font-semibold mb-2">All Routes ({routes.length})</h3>
+          <h3 className="font-semibold mb-2">全部路由（{routes.length}）</h3>
           <div className="max-h-64 overflow-y-auto border rounded">
             <table className="w-full text-xs">
               <thead className="bg-muted sticky top-0">
                 <tr>
-                  <th className="text-left p-2 font-semibold">Destination</th>
-                  <th className="text-left p-2 font-semibold">Gateway</th>
-                  <th className="text-left p-2 font-semibold">Flags</th>
-                  <th className="text-left p-2 font-semibold">Interface</th>
+                  <th className="text-left p-2 font-semibold">目标地址</th>
+                  <th className="text-left p-2 font-semibold">网关</th>
+                  <th className="text-left p-2 font-semibold">标志</th>
+                  <th className="text-left p-2 font-semibold">网络接口</th>
                 </tr>
               </thead>
               <tbody className="font-mono">

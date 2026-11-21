@@ -5,10 +5,11 @@ import { Loader2, CheckCircle2, XCircle, AlertTriangle, Shield } from 'lucide-re
 import { Button } from './components/ui/button';
 
 function Splash() {
-  const [statusText, setStatusText] = useState('Initializing...');
+  const [statusText, setStatusText] = useState('正在初始化…');
   const [progress, setProgress] = useState(0);
   const [checks, setChecks] = useState([]);
   const [error, setError] = useState(null);
+  const [appVersion, setAppVersion] = useState('');
 
   useEffect(() => {
     const { ipcRenderer } = window.require('electron');
@@ -46,17 +47,20 @@ function Splash() {
     });
 
     ipcRenderer.on('splash-error', (event, errorData) => {
-      setStatusText('Setup Required');
+      setStatusText('需要完成设置');
       setError(errorData);
     });
 
     ipcRenderer.on('splash-complete', () => {
-      setStatusText('System checks completed successfully!');
+      setStatusText('系统检查已全部通过！');
       setProgress(100);
     });
 
     // Notify main process that splash is loaded
     ipcRenderer.send('splash-loaded');
+
+    // Read version from the main process (single source of truth)
+    ipcRenderer.invoke('get-app-version').then((version) => setAppVersion(version));
 
     return () => {
       ipcRenderer.removeAllListeners('system-check-start');
@@ -101,7 +105,7 @@ function Splash() {
             <Shield className="h-12 w-12" />
           </div>
           <h1 className="text-4xl font-bold">OpenConnect VPN</h1>
-          <Badge variant="outline">Version 1.0.0</Badge>
+          <Badge variant="outline">版本 {appVersion}</Badge>
         </div>
 
         <Separator />
@@ -150,11 +154,11 @@ function Splash() {
 
           {error && (
             <div className="space-y-3 rounded-md border-2 border-destructive bg-destructive/10 p-4">
-              <div className="font-semibold">Setup Required</div>
+              <div className="font-semibold">需要完成设置</div>
               <div className="text-sm">{error.message}</div>
               {error.action === 'install-openconnect' && (
                 <Button onClick={handleInstallClick} className="w-full">
-                  Install OpenConnect
+                  安装 OpenConnect
                 </Button>
               )}
             </div>
@@ -162,7 +166,7 @@ function Splash() {
 
           {progress === 100 && !error && (
             <Button onClick={handleLoginClick} size="lg" className="w-full">
-              Continue to OpenConnect
+              进入 OpenConnect
             </Button>
           )}
         </div>

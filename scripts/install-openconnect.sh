@@ -6,66 +6,66 @@
 set -e
 
 echo "=========================================="
-echo "OpenConnect Installation Helper"
+echo "OpenConnect 安装助手"
 echo "=========================================="
 echo ""
 
 # Check if running on macOS
 if [[ "$OSTYPE" != "darwin"* ]]; then
-    echo "❌ This script is designed for macOS only"
+    echo "❌ 本脚本仅支持 macOS"
     exit 1
 fi
 
 # Check if Homebrew is installed
 if ! command -v brew &> /dev/null; then
-    echo "❌ Homebrew is not installed"
+    echo "❌ 未检测到 Homebrew"
     echo ""
-    echo "Please install Homebrew first:"
+    echo "请先安装 Homebrew："
     echo "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
     echo ""
     exit 1
 fi
 
-echo "✅ Homebrew is installed"
+echo "✅ Homebrew 已安装"
 echo ""
 
 # Check if OpenConnect is already installed
 if command -v openconnect &> /dev/null; then
     VERSION=$(openconnect --version | head -n1)
-    echo "✅ OpenConnect is already installed"
+    echo "✅ OpenConnect 已安装"
     echo "   $VERSION"
     echo ""
-    read -p "Do you want to upgrade to the latest version? (y/N): " -n 1 -r
+    read -p "是否升级到最新版本？(y/N): " -n 1 -r
     echo ""
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "⏳ Upgrading OpenConnect..."
+        echo "⏳ 正在升级 OpenConnect…"
         brew upgrade openconnect
-        echo "✅ OpenConnect upgraded successfully!"
+        echo "✅ OpenConnect 升级成功！"
     else
-        echo "Skipping upgrade"
+        echo "已跳过升级"
     fi
 else
-    echo "⏳ Installing OpenConnect via Homebrew..."
+    echo "⏳ 正在通过 Homebrew 安装 OpenConnect…"
     echo ""
 
     brew install openconnect
 
     if [ $? -eq 0 ]; then
         echo ""
-        echo "✅ OpenConnect installed successfully!"
+        echo "✅ OpenConnect 安装成功！"
         VERSION=$(openconnect --version | head -n1)
         echo "   $VERSION"
     else
         echo ""
-        echo "❌ Failed to install OpenConnect"
+        echo "❌ OpenConnect 安装失败"
         exit 1
     fi
 fi
 
 echo ""
 echo "=========================================="
-echo "Installation complete!"
+echo "安装完成！"
 echo "=========================================="
 echo ""
-echo "You can now use the OpenConnect VPN GUI application."
+echo "现在可以使用 OpenConnect VPN GUI 应用了。"
 echo ""

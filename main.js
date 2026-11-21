@@ -2,6 +2,10 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, dialog, shell } = require('elec
 const { spawn, exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+const crypto = require('crypto');
+const profileStore = require('./src/main/profiles');
+const parsers = require('./src/main/parsers');
 
 let mainWindow;
 let splashWindow;
@@ -57,17 +61,17 @@ async function performSystemChecks() {
   try {
     // Check 1: Electron runtime
     if (splashWindow) {
-      splashWindow.webContents.send('system-check-start', 'Application Runtime');
+      splashWindow.webContents.send('system-check-start', '应用运行时');
     }
     await new Promise(resolve => setTimeout(resolve, 300));
     if (splashWindow) {
-      splashWindow.webContents.send('system-check-complete', 'Application Runtime', true, `Electron v${process.versions.electron}`);
+      splashWindow.webContents.send('system-check-complete', '应用运行时', true, `Electron v${process.versions.electron}`);
     }
     updateProgress();
 
     // Check 2: File system access
     if (splashWindow) {
-      splashWindow.webContents.send('system-check-start', 'File System Access');
+      splashWindow.webContents.send('system-check-start', '文件系统访问');
     }
     await new Promise(resolve => setTimeout(resolve, 300));
     try {
@@ -76,30 +80,30 @@ async function performSystemChecks() {
         fs.mkdirSync(userDataPath, { recursive: true });
       }
       if (splashWindow) {
-        splashWindow.webContents.send('system-check-complete', 'File System Access', true, 'OK');
+        splashWindow.webContents.send('system-check-complete', '文件系统访问', true, '正常');
       }
     } catch (error) {
       if (splashWindow) {
-        splashWindow.webContents.send('system-check-complete', 'File System Access', false, error.message);
+        splashWindow.webContents.send('system-check-complete', '文件系统访问', false, error.message);
       }
     }
     updateProgress();
 
     // Check 3: OpenConnect installation
     if (splashWindow) {
-      splashWindow.webContents.send('system-check-start', 'OpenConnect Binary');
+      splashWindow.webContents.send('system-check-start', 'OpenConnect 可执行文件');
     }
     await new Promise(resolve => setTimeout(resolve, 300));
     const openconnectCheck = await checkOpenConnect();
     if (openconnectCheck.installed) {
       if (splashWindow) {
-        splashWindow.webContents.send('system-check-complete', 'OpenConnect Binary', true, openconnectCheck.path || 'Found');
+        splashWindow.webContents.send('system-check-complete', 'OpenConnect 可执行文件', true, openconnectCheck.path || '已找到');
       }
     } else {
       if (splashWindow) {
-        splashWindow.webContents.send('system-check-complete', 'OpenConnect Binary', false, 'Not installed');
+        splashWindow.webContents.send('system-check-complete', 'OpenConnect 可执行文件', false, '未安装');
         splashWindow.webContents.send('splash-error', {
-          message: 'OpenConnect is not installed. Install with: brew install openconnect',
+          message: '未检测到 OpenConnect，请执行：brew install openconnect',
           action: 'install-openconnect'
         });
       }
@@ -114,19 +118,19 @@ async function performSystemChecks() {
 
     // Check 4: Expect binary
     if (splashWindow) {
-      splashWindow.webContents.send('system-check-start', 'Expect Binary');
+      splashWindow.webContents.send('system-check-start', 'Expect 可执行文件');
     }
     await new Promise(resolve => setTimeout(resolve, 300));
     const expectCheck = await checkExpect();
     if (expectCheck.installed) {
       if (splashWindow) {
-        splashWindow.webContents.send('system-check-complete', 'Expect Binary', true, expectCheck.path || 'Found');
+        splashWindow.webContents.send('system-check-complete', 'Expect 可执行文件', true, expectCheck.path || '已找到');
       }
     } else {
       if (splashWindow) {
-        splashWindow.webContents.send('system-check-complete', 'Expect Binary', false, 'Not installed');
+        splashWindow.webContents.send('system-check-complete', 'Expect 可执行文件', false, '未安装');
         splashWindow.webContents.send('splash-error', {
-          message: 'Expect is not installed. It should be pre-installed on macOS. Try: brew install expect',
+          message: '未检测到 Expect。macOS 一般自带该工具，可尝试：brew install expect',
           action: null
         });
       }
@@ -138,27 +142,27 @@ async function performSystemChecks() {
 
     // Check 5: Network capabilities
     if (splashWindow) {
-      splashWindow.webContents.send('system-check-start', 'Network Capabilities');
+      splashWindow.webContents.send('system-check-start', '网络能力');
     }
     await new Promise(resolve => setTimeout(resolve, 300));
     if (splashWindow) {
-      splashWindow.webContents.send('system-check-complete', 'Network Capabilities', true, 'Available');
+      splashWindow.webContents.send('system-check-complete', '网络能力', true, '可用');
     }
     updateProgress();
 
     // Check 6: Sudo privileges
     if (splashWindow) {
-      splashWindow.webContents.send('system-check-start', 'Sudo Privileges');
+      splashWindow.webContents.send('system-check-start', 'sudo 权限');
     }
     await new Promise(resolve => setTimeout(resolve, 300));
     const sudoCheck = await checkSudoAccess();
     if (sudoCheck.available) {
       if (splashWindow) {
-        splashWindow.webContents.send('system-check-complete', 'Sudo Privileges', true, 'User has sudo access');
+        splashWindow.webContents.send('system-check-complete', 'sudo 权限', true, '当前用户具有 sudo 权限');
       }
     } else {
       if (splashWindow) {
-        splashWindow.webContents.send('system-check-warning', 'Sudo Privileges', 'Sudo required - will prompt when connecting');
+        splashWindow.webContents.send('system-check-warning', 'sudo 权限', '连接时需要 sudo 权限，届时会弹窗输入密码');
       }
     }
     updateProgress();
@@ -174,7 +178,7 @@ async function performSystemChecks() {
     console.error('System check error:', error);
     if (splashWindow) {
       splashWindow.webContents.send('splash-error', {
-        message: `System check failed: ${error.message}`
+        message: `系统检查失败：${error.message}`
       });
     }
     return false;
@@ -380,20 +384,28 @@ function createTray() {
   });
 }
 
+const statusLabels = {
+  disconnected: '未连接',
+  connecting: '连接中',
+  connected: '已连接'
+};
+
 function updateTrayMenu() {
   // Only update tray if it exists
   if (!tray) {
     return;
   }
 
+  const statusText = statusLabels[connectionStatus] || connectionStatus;
+
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: `Status: ${connectionStatus}`,
+      label: `状态：${statusText}`,
       enabled: false
     },
     { type: 'separator' },
     {
-      label: 'Show Window',
+      label: '显示主窗口',
       click: () => {
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.show();
@@ -401,7 +413,7 @@ function updateTrayMenu() {
       }
     },
     {
-      label: connectionStatus === 'connected' ? 'Disconnect' : 'Connect',
+      label: connectionStatus === 'connected' ? '断开连接' : '连接',
       enabled: false,
       click: () => {
         // Quick connect with last profile could be implemented here
@@ -409,7 +421,7 @@ function updateTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: 'Quit',
+      label: '退出',
       click: () => {
         app.isQuitting = true;
         app.quit();
@@ -418,13 +430,13 @@ function updateTrayMenu() {
   ]);
 
   tray.setContextMenu(contextMenu);
-  tray.setToolTip(`OpenConnect VPN - ${connectionStatus}`);
+  tray.setToolTip(`OpenConnect VPN - ${statusText}`);
 }
 
 // Handle VPN connection
 ipcMain.handle('connect-vpn', async (event, config) => {
   if (openconnectProcess) {
-    return { success: false, error: 'Already connected or connecting' };
+    return { success: false, error: '已在连接中或已连接' };
   }
 
 
@@ -474,17 +486,17 @@ ipcMain.handle('connect-vpn', async (event, config) => {
     args.push('--verbose'); // More detailed logging
 
     // Log the command being executed (without password)
-    sendLog(`Executing: sudo openconnect ${args.join(' ')}`, 'info');
+    sendLog(`执行命令：sudo openconnect ${args.join(' ')}`, 'info');
 
     // Request sudo password from user
-    sendLog('[DEBUG] Prompting for sudo password...', 'info');
+    sendLog('[调试] 正在弹出 sudo 密码输入框…', 'info');
     const sudoPassword = await promptForSudoPassword();
     if (!sudoPassword) {
-      sendLog('[ERROR] No sudo password provided by user', 'error');
+      sendLog('[错误] 用户未提供 sudo 密码', 'error');
       updateStatus('disconnected');
-      return { success: false, error: 'Sudo password required' };
+      return { success: false, error: '需要 sudo 密码' };
     }
-    sendLog('[DEBUG] Sudo password received (length: ' + sudoPassword.length + ')', 'info');
+    sendLog('[调试] 已收到 sudo 密码（长度：' + sudoPassword.length + '）', 'info');
 
     // Use expect script for proper PTY handling
     // In production, it's in extraResources; in dev, it's in project root
@@ -493,17 +505,33 @@ ipcMain.handle('connect-vpn', async (event, config) => {
       ? path.join(__dirname, 'vpn-connect.exp')
       : path.join(process.resourcesPath, 'vpn-connect.exp');
 
+    // Credentials must never be passed on the command line: argv is visible
+    // to other processes via `ps`. Write them to a 0600 temp file instead and
+    // let the expect script read and delete it immediately.
+    const credsPath = path.join(os.tmpdir(), `ocgui-auth-${crypto.randomBytes(8).toString('hex')}`);
+    fs.writeFileSync(
+      credsPath,
+      [sudoPassword, config.username.trim(), config.password.trim()].join('\n'),
+      { mode: 0o600 }
+    );
+
     const expectArgs = [
       expectScriptPath,
       openconnectPath,
-      sudoPassword,
-      config.username.trim(),
-      config.password.trim(),
+      credsPath,
       ...args
     ];
 
-    sendLog('[DEBUG] Using expect script for interactive authentication', 'info');
-    sendLog(`[DEBUG] Expect script path: ${expectScriptPath}`, 'info');
+    const removeCredsFile = () => {
+      try {
+        fs.unlinkSync(credsPath);
+      } catch {
+        // Already removed by the expect script
+      }
+    };
+
+    sendLog('[调试] 使用 expect 脚本进行交互式认证', 'info');
+    sendLog(`[调试] Expect 脚本路径：${expectScriptPath}`, 'info');
 
     const sudoProcess = spawn('expect', expectArgs, {
       stdio: ['pipe', 'pipe', 'pipe']
@@ -523,7 +551,7 @@ ipcMain.handle('connect-vpn', async (event, config) => {
       if ((output.includes('CONNECTED') || output.includes('Established') || output.includes('Configured as')) && !connected) {
         connected = true;
         updateStatus('connected');
-        sendLog('Connection established successfully!', 'info');
+        sendLog('连接建立成功！', 'info');
       }
     });
 
@@ -533,75 +561,77 @@ ipcMain.handle('connect-vpn', async (event, config) => {
       sendLog(output);
 
       // Check for sudo password errors
-      if (output.includes('[EXPECT ERROR] Incorrect sudo password')) {
+      if (output.includes('[EXPECT ERROR] 密码错误')) {
         authError = true;
-        sendLog('[ERROR] Sudo password authentication failed!', 'error');
+        sendLog('[错误] sudo 密码认证失败！', 'error');
       }
 
       // Check for VPN authentication errors
-      if (output.includes('[EXPECT ERROR] VPN authentication failed')) {
+      if (output.includes('[EXPECT ERROR] VPN 认证失败')) {
         authError = true;
-        sendLog('[ERROR] VPN credentials are incorrect!', 'error');
+        sendLog('[错误] VPN 账号或密码不正确！', 'error');
       }
 
       // Check for timeout errors
-      if (output.includes('[EXPECT ERROR] Timeout')) {
+      if (output.includes('[EXPECT ERROR] 超时')) {
         authError = true;
-        sendLog('[ERROR] Connection timeout occurred', 'error');
+        sendLog('[错误] 连接超时', 'error');
       }
 
       if ((output.includes('CONNECTED') || output.includes('Established') || output.includes('Configured as')) && !connected) {
         connected = true;
         updateStatus('connected');
-        sendLog('Connection established successfully!', 'info');
+        sendLog('连接建立成功！', 'info');
       }
 
       // Ignore vpnc-script errors (connection still works)
       if (output.includes('is not a recognized network service') || output.includes('Error: The parameters were not valid')) {
-        sendLog('Note: Route configuration had errors but VPN tunnel is established', 'info');
+        sendLog('提示：路由配置有报错，但 VPN 隧道已建立', 'info');
       }
     });
 
     // Handle process exit
     sudoProcess.on('close', (code) => {
+      removeCredsFile();
       const exitTime = new Date().toLocaleTimeString();
-      sendLog(`[DEBUG] OpenConnect process exited with code ${code} at ${exitTime}`);
+      sendLog(`[调试] OpenConnect 进程已退出，退出码 ${code}，时间 ${exitTime}`);
 
       openconnectProcess = null;
       updateStatus('disconnected');
 
       if (code !== 0 && code !== null) {
-        let errorMessage = `Connection closed with exit code ${code}`;
+        let errorMessage = `连接已关闭，退出码 ${code}`;
 
         // Provide specific error messages based on context
         if (authError) {
           if (code === 1) {
-            errorMessage = 'Authentication failed. Please check your credentials.';
+            errorMessage = '认证失败，请检查用户名和密码。';
           }
         } else if (code === 1) {
-          errorMessage = 'Connection failed. This may be due to incorrect sudo password or network issues.';
+          errorMessage = '连接失败，可能是 sudo 密码错误或网络问题。';
         }
 
-        sendLog(`[ERROR] ${errorMessage}`, 'error');
+        sendLog(`[错误] ${errorMessage}`, 'error');
 
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('connection-error', errorMessage);
         }
       } else if (code === 0 && connected) {
         // Clean exit while connected - this is unexpected
-        sendLog(`[WARNING] VPN disconnected cleanly. This may be due to:`, 'error');
-        sendLog(`  - Network interruption or timeout`, 'error');
-        sendLog(`  - Server-side disconnect (idle timeout, policy, etc.)`, 'error');
-        sendLog(`  - MTU/DTLS issues`, 'error');
+        sendLog(`[警告] VPN 意外断开，可能原因：`, 'error');
+        sendLog(`  - 网络中断或超时`, 'error');
+        sendLog(`  - 服务端主动断开（空闲超时、策略限制等）`, 'error');
+        sendLog(`  - MTU/DTLS 相关问题`, 'error');
 
         if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('connection-error', 'VPN disconnected. Check logs for details.');
+          mainWindow.webContents.send('connection-error', 'VPN 已断开，请查看日志获取详情。');
         }
       }
     });
 
     sudoProcess.on('error', (error) => {
-      sendLog(`Error: ${error.message}`, 'error');
+      removeCredsFile();
+      sendLog(`错误：${error.message}`, 'error');
       openconnectProcess = null;
       updateStatus('disconnected');
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -623,7 +653,7 @@ ipcMain.handle('disconnect-vpn', async () => {
 
 function disconnectVPN() {
   if (openconnectProcess) {
-    sendLog('Disconnecting...');
+    sendLog('正在断开连接…');
 
     // Close stdin to signal clean shutdown
     try {
@@ -638,7 +668,7 @@ function disconnectVPN() {
     // Give it 5 seconds to shut down gracefully, then force kill
     setTimeout(() => {
       if (openconnectProcess) {
-        sendLog('Force killing OpenConnect process...');
+        sendLog('正在强制结束 OpenConnect 进程…');
         openconnectProcess.kill('SIGKILL');
         openconnectProcess = null;
         updateStatus('disconnected');
@@ -647,7 +677,7 @@ function disconnectVPN() {
 
     return { success: true };
   }
-  return { success: false, error: 'Not connected' };
+  return { success: false, error: '当前未连接' };
 }
 
 // Get connection status
@@ -655,27 +685,19 @@ ipcMain.handle('get-status', async () => {
   return connectionStatus;
 });
 
-// Save profiles
-ipcMain.handle('save-profiles', async (event, profiles) => {
-  try {
-    fs.writeFileSync(PROFILES_FILE, JSON.stringify(profiles, null, 2));
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+// Get application version (single source of truth: package.json / Info.plist)
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
 });
 
-// Load profiles
+// Save profiles (passwords encrypted via the OS keychain when available)
+ipcMain.handle('save-profiles', async (event, profiles) => {
+  return profileStore.saveProfiles(PROFILES_FILE, profiles);
+});
+
+// Load profiles (transparently migrates legacy plaintext files)
 ipcMain.handle('load-profiles', async () => {
-  try {
-    if (fs.existsSync(PROFILES_FILE)) {
-      const data = fs.readFileSync(PROFILES_FILE, 'utf8');
-      return { success: true, profiles: JSON.parse(data) };
-    }
-    return { success: true, profiles: [] };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return profileStore.loadProfiles(PROFILES_FILE);
 });
 
 // Check if openconnect is installed
@@ -708,21 +730,21 @@ ipcMain.handle('check-running-processes', async () => {
 ipcMain.handle('kill-process', async (event, pid, sudoPassword) => {
   return new Promise((resolve) => {
     if (!pid) {
-      resolve({ success: false, error: 'PID is required' });
+      resolve({ success: false, error: '缺少 PID' });
       return;
     }
 
     // Validate PID is a positive integer (prevent command injection)
     const pidNumber = parseInt(pid, 10);
     if (!Number.isInteger(pidNumber) || pidNumber <= 0 || pidNumber.toString() !== pid.toString()) {
-      resolve({ success: false, error: 'Invalid PID format' });
+      resolve({ success: false, error: 'PID 格式无效' });
       return;
     }
 
     if (!sudoPassword) {
       resolve({
         success: false,
-        error: 'Sudo password required to kill processes',
+        error: '结束进程需要 sudo 密码',
         needsSudo: true
       });
       return;
@@ -747,24 +769,24 @@ ipcMain.handle('kill-process', async (event, pid, sudoPassword) => {
 
     sudoProcess.on('close', (code) => {
       if (code === 0) {
-        resolve({ success: true, message: `Process ${pid} killed successfully` });
+        resolve({ success: true, message: `进程 ${pid} 已结束` });
       } else {
         // Check for common error messages
         if (stderr.includes('Sorry, try again') || stderr.includes('incorrect password')) {
           resolve({
             success: false,
-            error: 'Incorrect sudo password',
+            error: 'sudo 密码错误',
             incorrectPassword: true
           });
         } else if (stderr.includes('No such process')) {
           resolve({
             success: false,
-            error: `Process ${pid} not found or already terminated`
+            error: `进程 ${pid} 不存在或已终止`
           });
         } else {
           resolve({
             success: false,
-            error: stderr || `Failed to kill process with exit code ${code}`
+            error: stderr || `结束进程失败，退出码 ${code}`
           });
         }
       }
@@ -791,7 +813,7 @@ ipcMain.handle('install-openconnect', async () => {
       : path.join(process.resourcesPath, 'scripts', 'install-openconnect.sh');
 
     if (!fs.existsSync(actualScriptPath)) {
-      resolve({ success: false, error: 'Installation script not found' });
+      resolve({ success: false, error: '未找到安装脚本' });
       return;
     }
 
@@ -822,34 +844,7 @@ ipcMain.handle('get-routes', async () => {
         return;
       }
 
-      // Parse routing table
-      const lines = stdout.split('\n');
-      const routes = [];
-      let inInternetSection = false;
-
-      for (const line of lines) {
-        if (line.includes('Internet:')) {
-          inInternetSection = true;
-          continue;
-        }
-        if (line.includes('Internet6:')) {
-          inInternetSection = false;
-          break;
-        }
-        if (inInternetSection && line.trim() && !line.includes('Destination')) {
-          const parts = line.trim().split(/\s+/);
-          if (parts.length >= 4) {
-            routes.push({
-              destination: parts[0],
-              gateway: parts[1],
-              flags: parts[2],
-              interface: parts[3]
-            });
-          }
-        }
-      }
-
-      resolve({ success: true, routes });
+      resolve({ success: true, routes: parsers.parseRoutes(stdout) });
     });
   });
 });
@@ -858,14 +853,14 @@ ipcMain.handle('get-routes', async () => {
 ipcMain.handle('test-connectivity', async (event, host, port) => {
   return new Promise((resolve) => {
     if (!host || !port) {
-      resolve({ success: false, error: 'Host and port are required' });
+      resolve({ success: false, error: '需要提供主机和端口' });
       return;
     }
 
     // Validate port is a number between 1-65535
     const portNumber = parseInt(port, 10);
     if (!Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535) {
-      resolve({ success: false, error: 'Invalid port number' });
+      resolve({ success: false, error: '端口号无效' });
       return;
     }
 
@@ -873,7 +868,7 @@ ipcMain.handle('test-connectivity', async (event, host, port) => {
     // Allow alphanumeric, dots, hyphens, and colons (for IPv6)
     const validHostPattern = /^[a-zA-Z0-9\.\-:]+$/;
     if (!validHostPattern.test(host)) {
-      resolve({ success: false, error: 'Invalid host format' });
+      resolve({ success: false, error: '主机格式无效' });
       return;
     }
 
@@ -925,7 +920,7 @@ ipcMain.handle('test-connectivity', async (event, host, port) => {
           success: false,
           host,
           port: portNumber,
-          message: 'Connection timed out',
+          message: '连接超时',
           reachable: false
         });
       }
@@ -937,7 +932,7 @@ ipcMain.handle('test-connectivity', async (event, host, port) => {
 ipcMain.handle('delete-route', async (event, destination, sudoPassword) => {
   return new Promise((resolve) => {
     if (!destination) {
-      resolve({ success: false, error: 'Destination is required' });
+      resolve({ success: false, error: '缺少目标地址' });
       return;
     }
 
@@ -945,14 +940,14 @@ ipcMain.handle('delete-route', async (event, destination, sudoPassword) => {
     // Allow: IP addresses, CIDR notation, or "default"
     const validDestinationPattern = /^(default|(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?)$/;
     if (!validDestinationPattern.test(destination)) {
-      resolve({ success: false, error: 'Invalid destination format' });
+      resolve({ success: false, error: '目标地址格式无效' });
       return;
     }
 
     if (!sudoPassword) {
       resolve({
         success: false,
-        error: 'Sudo password required',
+        error: '需要 sudo 密码',
         needsSudo: true
       });
       return;
@@ -977,19 +972,19 @@ ipcMain.handle('delete-route', async (event, destination, sudoPassword) => {
 
     sudoProcess.on('close', (code) => {
       if (code === 0) {
-        resolve({ success: true, message: `Route to ${destination} deleted` });
+        resolve({ success: true, message: `已删除到 ${destination} 的路由` });
       } else {
         // Check for common error messages
         if (stderr.includes('Sorry, try again') || stderr.includes('incorrect password')) {
           resolve({
             success: false,
-            error: 'Incorrect sudo password',
+            error: 'sudo 密码错误',
             incorrectPassword: true
           });
         } else {
           resolve({
             success: false,
-            error: stderr || `Failed with exit code ${code}`
+            error: stderr || `操作失败，退出码 ${code}`
           });
         }
       }
@@ -1014,32 +1009,7 @@ ipcMain.handle('get-network-interfaces', async () => {
         return;
       }
 
-      // Parse interfaces - simplified version
-      const interfaces = [];
-      const sections = stdout.split(/\n(?=[a-z])/);
-
-      for (const section of sections) {
-        const lines = section.split('\n');
-        const firstLine = lines[0];
-        if (!firstLine) continue;
-
-        const nameMatch = firstLine.match(/^([a-z0-9]+):/);
-        if (!nameMatch) continue;
-
-        const name = nameMatch[1];
-        const statusMatch = section.match(/status: (\w+)/);
-        const inetMatch = section.match(/inet (\d+\.\d+\.\d+\.\d+)/);
-
-        if (inetMatch || statusMatch) {
-          interfaces.push({
-            name,
-            status: statusMatch ? statusMatch[1] : 'unknown',
-            ip: inetMatch ? inetMatch[1] : null
-          });
-        }
-      }
-
-      resolve({ success: true, interfaces });
+      resolve({ success: true, interfaces: parsers.parseNetworkInterfaces(stdout) });
     });
   });
 });
@@ -1090,7 +1060,7 @@ ipcMain.on('splash-ready', () => {
           createTray();
         }
       } catch (error) {
-        console.log('Tray icon not found, skipping tray creation');
+        console.log('托盘图标创建失败，已跳过托盘：', error.message);
       }
     });
   }
@@ -1118,7 +1088,7 @@ function sendLog(message, type = 'info') {
 async function promptForSudoPassword() {
   return new Promise((resolve) => {
     // Create a simple dialog to get sudo password
-    sendLog('[DEBUG] Creating sudo password prompt window...', 'info');
+    sendLog('[调试] 正在创建 sudo 密码输入窗口…', 'info');
 
     const promptWindow = new BrowserWindow({
       width: 520,
@@ -1144,26 +1114,26 @@ async function promptForSudoPassword() {
     }
 
     ipcMain.once('sudo-password-entered', (event, password) => {
-      sendLog('[DEBUG] Sudo password entered by user', 'info');
+      sendLog('[调试] 用户已提交 sudo 密码', 'info');
       promptWindow.close();
       resolve(password);
     });
 
     promptWindow.on('closed', () => {
-      sendLog('[DEBUG] Sudo password prompt window closed', 'info');
+      sendLog('[调试] sudo 密码输入窗口已关闭', 'info');
       // If window was closed without entering password, resolve with null
       resolve(null);
     });
 
     promptWindow.once('ready-to-show', () => {
-      sendLog('[DEBUG] Sudo password prompt ready to show', 'info');
+      sendLog('[调试] sudo 密码输入窗口已就绪', 'info');
       promptWindow.show();
     });
 
     // Fallback: show after a short delay if ready-to-show doesn't fire
     setTimeout(() => {
       if (promptWindow && !promptWindow.isDestroyed() && !promptWindow.isVisible()) {
-        sendLog('[DEBUG] Showing sudo password prompt (fallback)', 'info');
+        sendLog('[调试] 强制显示 sudo 密码输入窗口（兜底）', 'info');
         promptWindow.show();
       }
     }, 100);

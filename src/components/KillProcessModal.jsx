@@ -15,7 +15,7 @@ function KillProcessModal({ process, onConfirm, onCancel }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!password) {
-      setError('Password is required');
+      setError('请输入密码');
       return;
     }
 
@@ -50,9 +50,9 @@ function KillProcessModal({ process, onConfirm, onCancel }) {
             <AlertTriangle className="h-6 w-6 text-destructive" />
           </div>
           <div className="flex-1">
-            <h2 className="text-lg font-semibold">Kill Process</h2>
+            <h2 className="text-lg font-semibold">结束进程</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              This will forcefully terminate the OpenConnect process
+              此操作将强制终止该 OpenConnect 进程
             </p>
           </div>
         </div>
@@ -65,12 +65,12 @@ function KillProcessModal({ process, onConfirm, onCancel }) {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 text-muted-foreground" />
-              <Label htmlFor="sudo-password">Administrator Password</Label>
+              <Label htmlFor="sudo-password">管理员密码</Label>
             </div>
             <Input
               type="password"
               id="sudo-password"
-              placeholder="Enter your password"
+              placeholder="请输入密码"
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
@@ -83,22 +83,22 @@ function KillProcessModal({ process, onConfirm, onCancel }) {
               <p className="text-sm text-destructive">{error}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Administrator privileges are required to kill processes
+              结束进程需要管理员权限
             </p>
           </div>
 
           <div className="bg-amber-500/10 border border-amber-500/20 rounded p-3">
             <p className="text-sm text-amber-900 dark:text-amber-200">
-              <strong>Warning:</strong> This will send a SIGKILL (-9) signal to forcefully terminate the process. Any unsaved data or active connections will be lost.
+              <strong>警告：</strong>此操作会发送 SIGKILL（-9）信号强制终止进程，未保存的数据和活动连接都会丢失。
             </p>
           </div>
 
           <div className="flex gap-3 justify-end">
             <Button type="button" variant="outline" onClick={handleCancel} disabled={isKilling}>
-              Cancel
+              取消
             </Button>
             <Button type="submit" variant="destructive" disabled={isKilling}>
-              {isKilling ? 'Killing...' : 'Kill Process'}
+              {isKilling ? '正在结束…' : '结束进程'}
             </Button>
           </div>
         </form>

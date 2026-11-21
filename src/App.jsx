@@ -8,6 +8,12 @@ import Navigation from './components/Navigation';
 import Alert from './components/Alert';
 import { Badge } from './components/ui/badge';
 
+const statusLabels = {
+  disconnected: '未连接',
+  connecting: '连接中',
+  connected: '已连接',
+};
+
 function App() {
   const [profiles, setProfiles] = useState([]);
   const [currentStatus, setCurrentStatus] = useState('disconnected');
@@ -19,6 +25,7 @@ function App() {
   const [currentView, setCurrentView] = useState('connection');
   const [problematicRoutesCount, setProblematicRoutesCount] = useState(0);
   const [runningProcessesCount, setRunningProcessesCount] = useState(0);
+  const [appVersion, setAppVersion] = useState('');
 
   useEffect(() => {
     // Initialize the app
@@ -28,8 +35,8 @@ function App() {
       setOpenConnectInstalled(installed);
 
       if (!installed) {
-        showAlert('OpenConnect is not installed. Please install it first (brew install openconnect)', 'error');
-        addLog('OpenConnect not found. Install with: brew install openconnect', 'error');
+        showAlert('未检测到 OpenConnect，请先安装（brew install openconnect）', 'error');
+        addLog('未找到 OpenConnect，安装命令：brew install openconnect', 'error');
       }
 
       // Load saved profiles
@@ -38,6 +45,9 @@ function App() {
       // Get initial status
       const status = await window.electronAPI.getStatus();
       setCurrentStatus(status);
+
+      // Get application version (from package.json / Info.plist)
+      setAppVersion(await window.electronAPI.getAppVersion());
     };
 
     init();
@@ -53,7 +63,7 @@ function App() {
 
     window.electronAPI.onConnectionError((error) => {
       showAlert(error, 'error');
-      addLog(`Error: ${error}`, 'error');
+      addLog(`错误：${error}`, 'error');
     });
   }, []);
 
@@ -62,14 +72,14 @@ function App() {
     if (result.success) {
       setProfiles(result.profiles || []);
     } else {
-      showAlert(`Failed to load profiles: ${result.error}`, 'error');
+      showAlert(`加载配置失败：${result.error}`, 'error');
     }
   };
 
   const saveProfiles = async (newProfiles) => {
     const result = await window.electronAPI.saveProfiles(newProfiles);
     if (!result.success) {
-      showAlert(`Failed to save profiles: ${result.error}`, 'error');
+      showAlert(`保存配置失败：${result.error}`, 'error');
     }
   };
 
@@ -84,7 +94,7 @@ function App() {
 
   const clearLogs = () => {
     setLogs([]);
-    addLog('Logs cleared', 'info');
+    addLog('日志已清空', 'info');
   };
 
   const showAlert = (message, type = 'info') => {
@@ -105,10 +115,10 @@ function App() {
       const response = await fetch('https://api.ipify.org?format=json', { timeout: 5000 });
       const data = await response.json();
       setIpAddress({ current: data.ip, loading: false });
-      addLog(`Current IP: ${data.ip}`, 'info');
+      addLog(`当前 IP：${data.ip}`, 'info');
     } catch (error) {
-      setIpAddress({ current: 'Unable to fetch', loading: false });
-      addLog('Failed to fetch IP address', 'error');
+      setIpAddress({ current: '获取失败', loading: false });
+      addLog('获取 IP 地址失败', 'error');
     }
   };
 
@@ -137,14 +147,14 @@ function App() {
         <div className="flex items-center gap-3">
           {ipAddress.current && (
             <div className="text-sm">
-              <span className="text-muted-foreground">IP: </span>
+              <span className="text-muted-foreground">公网 IP：</span>
               <span className="font-mono font-semibold">
-                {ipAddress.loading ? 'Loading...' : ipAddress.current}
+                {ipAddress.loading ? '加载中…' : ipAddress.current}
               </span>
             </div>
           )}
           <Badge variant={currentStatus === 'connected' ? 'default' : currentStatus === 'connecting' ? 'secondary' : 'outline'}>
-            {currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}
+            {statusLabels[currentStatus] || currentStatus}
           </Badge>
         </div>
       </header>
@@ -212,7 +222,7 @@ function App() {
       {/* Footer */}
       <footer className="flex-shrink-0 px-6 py-2 border-t bg-muted/30">
         <div className="flex justify-end">
-          <span className="text-xs text-muted-foreground">v1.0.0</span>
+          <span className="text-xs text-muted-foreground">v{appVersion}</span>
         </div>
       </footer>
     </div>

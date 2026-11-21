@@ -12,11 +12,11 @@ function BasicLogs({ logs, onViewAllLogs }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ScrollText className="h-5 w-5" />
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle>最近活动</CardTitle>
           </div>
           <Button variant="outline" size="sm" onClick={onViewAllLogs}>
             <ExternalLink className="h-4 w-4 mr-2" />
-            View All Logs
+            查看全部日志
           </Button>
         </div>
       </CardHeader>
@@ -27,13 +27,13 @@ function BasicLogs({ logs, onViewAllLogs }) {
               <div className="flex items-start gap-2">
                 <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-blue-800 dark:text-blue-200">
-                  <strong>Recent Activity</strong> shows the last 10 connection events. Monitor connection attempts, authentication status, and errors here. Click "View All Logs" for complete history.
+                  <strong>最近活动</strong>显示最近的 10 条连接事件，可在这里查看连接尝试、认证状态和错误信息。点击「查看全部日志」获取完整历史。
                 </p>
               </div>
             </div>
             <div className="text-center py-6 text-muted-foreground flex-1 flex flex-col items-center justify-center">
               <ScrollText className="h-8 w-8 mb-2 opacity-50" />
-              <p className="text-sm">No activity yet</p>
+              <p className="text-sm">暂无活动记录</p>
             </div>
           </div>
         ) : (
@@ -42,7 +42,7 @@ function BasicLogs({ logs, onViewAllLogs }) {
               <div className="flex items-start gap-2">
                 <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-blue-800 dark:text-blue-200">
-                  <strong>Recent Activity</strong> shows the last 10 connection events. Monitor connection attempts, authentication status, and errors here. Click "View All Logs" for complete history.
+                  <strong>最近活动</strong>显示最近的 10 条连接事件，可在这里查看连接尝试、认证状态和错误信息。点击「查看全部日志」获取完整历史。
                 </p>
               </div>
             </div>

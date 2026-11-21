@@ -3,6 +3,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Application metadata
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+
   // VPN connection methods
   connectVPN: (config) => ipcRenderer.invoke('connect-vpn', config),
   disconnectVPN: () => ipcRenderer.invoke('disconnect-vpn'),

@@ -2,88 +2,99 @@
 
 set timeout 30
 set openconnect_path [lindex $argv 0]
-set sudo_password [lindex $argv 1]
-set username [lindex $argv 2]
-set vpn_password [lindex $argv 3]
-set args [lrange $argv 4 end]
+set creds_path [lindex $argv 1]
+set args [lrange $argv 2 end]
+
+# Read credentials from the 0600 temp file, then delete it immediately so
+# secrets never appear in the process list.
+if {![file exists $creds_path]} {
+    puts "\[EXPECT ERROR\] 凭据临时文件不存在"
+    exit 1
+}
+set creds_fh [open $creds_path r]
+set sudo_password [gets $creds_fh]
+set username [gets $creds_fh]
+set vpn_password [gets $creds_fh]
+close $creds_fh
+file delete $creds_path
 
 log_user 1
 
 # Start sudo openconnect
-puts "\[EXPECT\] Starting sudo openconnect..."
+puts "\[EXPECT\] 正在启动 sudo openconnect…"
 eval spawn sudo -S $openconnect_path {*}$args
 
 # Send sudo password
-puts "\[EXPECT\] Waiting for sudo password prompt..."
+puts "\[EXPECT\] 等待 sudo 密码提示…"
 expect {
     "Password:" {
-        puts "\[EXPECT\] Sudo password prompt detected, sending password..."
+        puts "\[EXPECT\] 检测到 sudo 密码提示，正在发送密码…"
         send "$sudo_password\r"
         exp_continue
     }
     "Sorry, try again" {
-        puts "\[EXPECT ERROR\] Incorrect sudo password!"
+        puts "\[EXPECT ERROR\] 密码错误！"
         exit 1
     }
     -re "(Failed to connect|Failed to open|connection failed|Connection refused)" {
-        puts "\[EXPECT ERROR\] Network connection failed before authentication"
+        puts "\[EXPECT ERROR\] 认证前网络连接失败"
         exit 1
     }
     -re "(Please enter your username|Username:)" {
-        puts "\[EXPECT\] Sudo authentication successful, got username prompt"
+        puts "\[EXPECT\] sudo 认证成功，已进入用户名提示"
     }
     eof {
-        puts "\[EXPECT ERROR\] OpenConnect process ended unexpectedly"
+        puts "\[EXPECT ERROR\] OpenConnect 进程意外退出"
         exit 1
     }
     timeout {
-        puts "\[EXPECT ERROR\] Timeout waiting for sudo password prompt"
+        puts "\[EXPECT ERROR\] 超时：等待 sudo 密码提示"
         exit 1
     }
 }
 
 # Send username (already matched in previous expect)
-puts "\[EXPECT\] Sending VPN username..."
+puts "\[EXPECT\] 正在发送 VPN 用户名…"
 send "$username\r"
 
 # Wait for password prompt
-puts "\[EXPECT\] Waiting for VPN password prompt..."
+puts "\[EXPECT\] 等待 VPN 密码提示…"
 expect {
     -re "(Please enter your password|Password:)" {
-        puts "\[EXPECT\] VPN password prompt detected, sending password..."
+        puts "\[EXPECT\] 检测到 VPN 密码提示，正在发送密码…"
         send "$vpn_password\r"
     }
     timeout {
-        puts "\[EXPECT ERROR\] Timeout waiting for VPN password prompt"
+        puts "\[EXPECT ERROR\] 超时：等待 VPN 密码提示"
         exit 1
     }
 }
 
 # Wait for connection or error
-puts "\[EXPECT\] Waiting for connection result..."
+puts "\[EXPECT\] 等待连接结果…"
 expect {
     -re "(CONNECTED|Established|Configured as)" {
-        puts "\[EXPECT\] VPN connection established!"
+        puts "\[EXPECT\] VPN 连接已建立！"
     }
     -re "(Login failed|authentication failed|Invalid username or password)" {
-        puts "\[EXPECT ERROR\] VPN authentication failed - invalid credentials"
+        puts "\[EXPECT ERROR\] VPN 认证失败，用户名或密码无效"
         exit 1
     }
     timeout {
-        puts "\[EXPECT\] Continuing connection (may be established)..."
+        puts "\[EXPECT\] 继续连接（可能已建立）…"
     }
 }
 
 # Keep the connection alive and log when it ends
-puts "\[EXPECT\] Connection established, monitoring..."
+puts "\[EXPECT\] 连接已建立，正在监控…"
 
 # Set timeout to -1 (infinite) to keep connection alive indefinitely
 set timeout -1
 
 expect {
     eof {
-        puts "\[EXPECT\] OpenConnect process ended (EOF received)"
+        puts "\[EXPECT\] OpenConnect 进程已结束（收到 EOF）"
     }
 }
 
-puts "\[EXPECT\] Expect script exiting..."
+puts "\[EXPECT\] Expect 脚本退出…"
