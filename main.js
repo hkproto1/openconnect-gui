@@ -398,6 +398,10 @@ function updateTrayMenu() {
 
   const statusText = statusLabels[connectionStatus] || connectionStatus;
 
+  // Login item can only be registered by a packaged .app bundle
+  const canToggleLoginItem = app.isPackaged;
+  const loginItemEnabled = canToggleLoginItem && app.getLoginItemSettings().openAtLogin;
+
   const contextMenu = Menu.buildFromTemplate([
     {
       label: `状态：${statusText}`,
@@ -417,6 +421,16 @@ function updateTrayMenu() {
       enabled: false,
       click: () => {
         // Quick connect with last profile could be implemented here
+      }
+    },
+    {
+      label: canToggleLoginItem ? '开机自动启动' : '开机自动启动（打包版可用）',
+      type: 'checkbox',
+      checked: loginItemEnabled,
+      enabled: canToggleLoginItem,
+      click: (menuItem) => {
+        app.setLoginItemSettings({ openAtLogin: menuItem.checked });
+        updateTrayMenu();
       }
     },
     { type: 'separator' },
@@ -1142,12 +1156,29 @@ async function promptForSudoPassword() {
 
 // App lifecycle
 app.whenReady().then(() => {
-  // Show splash screen first
-  createSplashWindow();
+  const loginItemSettings = app.getLoginItemSettings();
+
+  // 由“开机自动启动”拉起时：跳过启动页，创建隐藏的主窗口并直接驻留托盘，
+  // 避免登录后弹窗打断用户。
+  if (app.isPackaged && loginItemSettings.wasOpenedAtLogin) {
+    createWindow();
+    try {
+      createTray();
+    } catch (error) {
+      console.log('托盘图标创建失败，已跳过托盘：', error.message);
+    }
+  } else {
+    // Show splash screen first
+    createSplashWindow();
+  }
 
   // Don't create main window yet - wait for splash to complete
 
   app.on('activate', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      return;
+    }
     if (BrowserWindow.getAllWindows().length === 0) {
       createSplashWindow();
     }
