@@ -7,6 +7,7 @@
     "postinstall": "node scripts/create-tray-icon.js",
     "dev": "vite",
     "build": "vite build",
+    "test": "node --test test/",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173/pages/index.html && electron .\"",
     "electron:build": "vite build && electron-builder",
@@ -19,7 +20,7 @@
     "electron",
     "macos"
   ],
-  "author": "",
+  "author": "hkproto1",
   "license": "MIT",
   "dependencies": {
     "@radix-ui/react-label": "^2.0.2",
@@ -46,8 +47,11 @@
     "wait-on": "^7.2.0"
   },
   "build": {
-    "appId": "com.openconnect.gui",
+    "appId": "com.hkproto1.openconnectgui",
     "productName": "OpenConnect VPN",
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "main.js",
       "preload.js",
@@ -76,7 +80,7 @@
     "mac": {
       "category": "public.app-category.utilities",
       "target": "dmg",
-      "icon": "build/icon.icns"
+      "icon": "assets/icon.icns"
     }
   }
 }
