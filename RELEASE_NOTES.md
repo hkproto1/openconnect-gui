@@ -1,8 +1,12 @@
 # OpenConnect VPN GUI（hkproto1 fork）
 
-## v1.1.0
+## v1.1.1
 
-首个内部版本，在 [jadedm/openconnect-gui](https://github.com/jadedm/openconnect-gui) 基础上二次开发。
+首个可用版本，在 [jadedm/openconnect-gui](https://github.com/jadedm/openconnect-gui) 基础上二次开发。
+
+### 修复
+
+- 修复 v1.1.0 安装后无法启动：打包白名单遗漏 `src/main/`，导致 `Cannot find module './src/main/profiles'`；现已包含该目录
 
 ### 新增
 
@@ -28,7 +32,7 @@
 
 ### 安装（Apple Silicon）
 
-1. 下载 `OpenConnect VPN-1.1.0-arm64.dmg`
+1. 下载 `OpenConnect VPN-1.1.1-arm64.dmg`
 2. 将应用拖入 `/Applications`
 3. 本包未签名，首次启动需清除隔离标记：
 
