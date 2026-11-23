@@ -1,4 +1,55 @@
-# OpenConnect VPN GUI v1.0.0
+# OpenConnect VPN GUI（hkproto1 fork）
+
+## v1.1.0
+
+首个内部版本，在 [jadedm/openconnect-gui](https://github.com/jadedm/openconnect-gui) 基础上二次开发。
+
+### 新增
+
+- 全界面中文化：连接、日志、网络诊断、进程监控、安装页、启动页、托盘与系统提示
+- 托盘快速连接：直接使用已保存配置发起连接，支持从托盘断开
+- 开机自动启动（仅打包版，托盘菜单中开关）；登录后后台驻留托盘，不弹启动页
+- 连接状态显示、系统通知与错误弹窗（主窗口隐藏时也能收到反馈）
+- 退出确认：VPN 连接中退出会先确认
+- 独立应用图标与 appId（`com.hkproto1.openconnectgui`）
+
+### 安全
+
+- 配置密码改用 macOS 钥匙串（`safeStorage`）加密存储，旧版明文 `profiles.json` 首次加载时自动迁移为 v2 加密格式
+- 修复凭据泄漏：sudo 密码与 VPN 密码不再出现在进程命令行中（`ps aux` 不可见），改为 0600 临时文件并在读取后立即删除
+- 配置文件权限收紧为 `0600`，写入采用原子替换
+
+### 工程
+
+- 版本号单一来源（`app.getVersion()`），页脚与启动页自动同步
+- 网络路由/接口解析抽离为纯函数模块，新增 `node:test` 单测
+- 新增 GitHub Actions CI（macOS runner：测试 + 前端构建）
+- 打包输出改到 `release/`，不再与 Vite 的 `dist` 冲突
+
+### 安装（Apple Silicon）
+
+1. 下载 `OpenConnect VPN-1.1.0-arm64.dmg`
+2. 将应用拖入 `/Applications`
+3. 本包未签名，首次启动需清除隔离标记：
+
+```bash
+xattr -cr "/Applications/OpenConnect VPN.app"
+open "/Applications/OpenConnect VPN.app"
+```
+
+4. 依赖本机已安装 OpenConnect：`brew install openconnect`
+5. 「开机自动启动」需要应用保持固定在 `/Applications`；移动应用后需重新勾选
+6. 首次进入主界面会把 `profiles.json` 迁移为加密格式，迁移后旧版应用将无法读取该文件
+
+### 已知限制
+
+- 仅提供 arm64 构建
+- 未签名/未公证，首次启动需手动清除 quarantine
+- 密码以钥匙串加密保存；换机或重装系统后需重新输入密码
+
+---
+
+# OpenConnect VPN GUI v1.0.0（上游版本）
 
 Native macOS application for managing OpenConnect VPN connections with advanced network diagnostics and process monitoring.
 
