@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, dialog, shell, nativeImage, Notification } = require('electron');
 const { spawn, exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -373,7 +373,16 @@ function getVpncScriptPath() {
 
 // Create system tray
 function createTray() {
-  tray = new Tray(path.join(__dirname, 'assets', 'tray-icon.png'));
+  // macOS 菜单栏图标优先使用模板图像，自动适配浅色/深色模式
+  const templatePath = path.join(__dirname, 'assets', 'tray-iconTemplate.png');
+  const templateImage = nativeImage.createFromPath(templatePath);
+
+  if (templateImage.isEmpty()) {
+    tray = new Tray(path.join(__dirname, 'assets', 'tray-icon.png'));
+  } else {
+    templateImage.setTemplateImage(true);
+    tray = new Tray(templateImage);
+  }
 
   updateTrayMenu();
 
@@ -390,6 +399,36 @@ const statusLabels = {
   connected: '已连接'
 };
 
+// 托盘“快速连接”可用的已保存配置
+function getTrayProfiles() {
+  const result = profileStore.loadProfiles(PROFILES_FILE);
+  if (!result.success) {
+    return [];
+  }
+  return result.profiles.filter((profile) => profile.server && profile.username);
+}
+
+// 直接从托盘用已保存配置发起连接
+async function connectFromTray(profile) {
+  const result = await startConnection({
+    server: profile.server,
+    username: profile.username,
+    password: profile.password || '',
+    authgroup: profile.authgroup || undefined,
+    protocol: profile.protocol || 'anyconnect',
+    serverCert: profile.serverCert || undefined
+  });
+
+  if (!result.success) {
+    dialog.showMessageBox({
+      type: 'warning',
+      title: 'OpenConnect VPN',
+      message: result.error || '连接失败',
+      buttons: ['确定']
+    });
+  }
+}
+
 function updateTrayMenu() {
   // Only update tray if it exists
   if (!tray) {
@@ -401,6 +440,14 @@ function updateTrayMenu() {
   // Login item can only be registered by a packaged .app bundle
   const canToggleLoginItem = app.isPackaged;
   const loginItemEnabled = canToggleLoginItem && app.getLoginItemSettings().openAtLogin;
+
+  const trayProfiles = getTrayProfiles();
+  const quickConnectItems = trayProfiles.length > 0
+    ? trayProfiles.map((profile) => ({
+        label: profile.name || profile.server,
+        click: () => connectFromTray(profile)
+      }))
+    : [{ label: '暂无已保存的配置', enabled: false }];
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -417,10 +464,23 @@ function updateTrayMenu() {
       }
     },
     {
-      label: connectionStatus === 'connected' ? '断开连接' : '连接',
-      enabled: false,
+      label: '快速连接',
+      enabled: connectionStatus === 'disconnected',
+      submenu: quickConnectItems
+    },
+    {
+      label: '断开连接',
+      enabled: connectionStatus !== 'disconnected',
       click: () => {
-        // Quick connect with last profile could be implemented here
+        const result = disconnectVPN();
+        if (!result.success) {
+          dialog.showMessageBox({
+            type: 'warning',
+            title: 'OpenConnect VPN',
+            message: result.error || '断开连接失败',
+            buttons: ['确定']
+          });
+        }
       }
     },
     {
@@ -436,7 +496,21 @@ function updateTrayMenu() {
     { type: 'separator' },
     {
       label: '退出',
-      click: () => {
+      click: async () => {
+        if (connectionStatus === 'connected' || connectionStatus === 'connecting') {
+          const { response } = await dialog.showMessageBox({
+            type: 'warning',
+            title: 'OpenConnect VPN',
+            message: 'VPN 处于连接状态',
+            detail: '退出应用会断开当前连接，是否继续？',
+            buttons: ['取消', '退出'],
+            defaultId: 0,
+            cancelId: 0
+          });
+          if (response !== 1) {
+            return;
+          }
+        }
         app.isQuitting = true;
         app.quit();
       }
@@ -447,12 +521,11 @@ function updateTrayMenu() {
   tray.setToolTip(`OpenConnect VPN - ${statusText}`);
 }
 
-// Handle VPN connection
-ipcMain.handle('connect-vpn', async (event, config) => {
+// 启动 VPN 连接。渲染层的 IPC 调用和托盘快速连接共用同一份逻辑。
+async function startConnection(config) {
   if (openconnectProcess) {
     return { success: false, error: '已在连接中或已连接' };
   }
-
 
   try {
     updateStatus('connecting');
@@ -626,10 +699,7 @@ ipcMain.handle('connect-vpn', async (event, config) => {
         }
 
         sendLog(`[错误] ${errorMessage}`, 'error');
-
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('connection-error', errorMessage);
-        }
+        notifyConnectionError(errorMessage);
       } else if (code === 0 && connected) {
         // Clean exit while connected - this is unexpected
         sendLog(`[警告] VPN 意外断开，可能原因：`, 'error');
@@ -637,9 +707,7 @@ ipcMain.handle('connect-vpn', async (event, config) => {
         sendLog(`  - 服务端主动断开（空闲超时、策略限制等）`, 'error');
         sendLog(`  - MTU/DTLS 相关问题`, 'error');
 
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('connection-error', 'VPN 已断开，请查看日志获取详情。');
-        }
+        notifyConnectionError('VPN 已断开，请查看日志获取详情。');
       }
     });
 
@@ -648,9 +716,7 @@ ipcMain.handle('connect-vpn', async (event, config) => {
       sendLog(`错误：${error.message}`, 'error');
       openconnectProcess = null;
       updateStatus('disconnected');
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('connection-error', error.message);
-      }
+      notifyConnectionError(error.message);
     });
 
     return { success: true };
@@ -658,6 +724,11 @@ ipcMain.handle('connect-vpn', async (event, config) => {
     updateStatus('disconnected');
     return { success: false, error: error.message };
   }
+}
+
+// Handle VPN connection
+ipcMain.handle('connect-vpn', async (event, config) => {
+  return startConnection(config);
 });
 
 // Handle VPN disconnection
@@ -706,7 +777,12 @@ ipcMain.handle('get-app-version', () => {
 
 // Save profiles (passwords encrypted via the OS keychain when available)
 ipcMain.handle('save-profiles', async (event, profiles) => {
-  return profileStore.saveProfiles(PROFILES_FILE, profiles);
+  const result = profileStore.saveProfiles(PROFILES_FILE, profiles);
+  if (result.success) {
+    // 配置变化后同步刷新托盘里的快速连接列表
+    updateTrayMenu();
+  }
+  return result;
 });
 
 // Load profiles (transparently migrates legacy plaintext files)
@@ -1090,6 +1166,9 @@ function updateStatus(status) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('status-changed', status);
   }
+  if (status === 'connected') {
+    notifyConnected();
+  }
   updateTrayMenu();
 }
 
@@ -1099,16 +1178,47 @@ function sendLog(message, type = 'info') {
   }
 }
 
+// 主窗口隐藏时（例如从托盘快速连接），用系统弹窗给出失败反馈
+function notifyConnectionError(message) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('connection-error', message);
+    if (mainWindow.isVisible()) {
+      return;
+    }
+  }
+  dialog.showMessageBox({
+    type: 'error',
+    title: 'OpenConnect VPN',
+    message,
+    buttons: ['确定']
+  });
+}
+
+// 连接成功且主窗口不可见时，用系统通知告知用户
+function notifyConnected() {
+  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+    return;
+  }
+  if (Notification.isSupported()) {
+    new Notification({ title: 'VPN 已连接', body: 'OpenConnect VPN 连接已建立' }).show();
+  }
+}
+
 async function promptForSudoPassword() {
   return new Promise((resolve) => {
     // Create a simple dialog to get sudo password
     sendLog('[调试] 正在创建 sudo 密码输入窗口…', 'info');
 
+    // 从托盘快速连接时主窗口可能处于隐藏状态，此时不要挂为模态子窗口
+    const hasVisibleParent = Boolean(
+      mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()
+    );
+
     const promptWindow = new BrowserWindow({
       width: 520,
       height: 400,
-      parent: mainWindow,
-      modal: true,
+      parent: hasVisibleParent ? mainWindow : undefined,
+      modal: hasVisibleParent,
       show: false,
       resizable: false,
       minimizable: false,
