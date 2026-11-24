@@ -1,5 +1,46 @@
 # OpenConnect VPN GUI（hkproto1 fork）
 
+## v1.2.0
+
+> 升级建议：曾遇到“更换网络后同一 VPN 服务器连不上”的用户请更新到本版本。
+
+### 修复
+
+- 连接前自动清理残留主机路由：上次连接遗留的 `UGHS` 主机路由可能仍指向上一个网络的私网网关，导致 `Can't assign requested address` 并使新网络下无法连接服务器；现在每次连接前自动检测并删除（仅当网关为私网地址且不在当前网段时才删除，避免误删正常路由）
+- 清理失败不会阻塞连接；sudo 密码错误时会直接提示并终止
+
+### 新增
+
+- 自动更新检查：
+  - 应用启动后静默检查 GitHub Releases，有新版本时发送系统通知
+  - 托盘菜单新增「检查更新」，可手动检查并查看更新说明
+  - 确认后自动下载 dmg 到「下载」目录并打开，拖入「应用程序」覆盖即可完成升级
+  - 应用未签名，因此不会静默替换安装，需手动确认覆盖
+
+### 工程
+
+- 新增 `src/main/routes.js` 与 `src/main/updater.js`，均附带 `node:test` 单测（共 19 条）
+
+### 安装（Apple Silicon）
+
+1. 下载 `OpenConnect VPN-1.2.0-arm64.dmg`
+2. 将应用拖入 `/Applications`
+3. 本包未签名，首次启动需清除隔离标记：
+
+```bash
+xattr -cr "/Applications/OpenConnect VPN.app"
+open "/Applications/OpenConnect VPN.app"
+```
+
+4. 依赖本机已安装 OpenConnect：`brew install openconnect`
+5. 「开机自动启动」需要应用保持固定在 `/Applications`；移动应用后需重新勾选
+
+### 已知限制
+
+- 仅提供 arm64 构建
+- 未签名/未公证，首次启动需手动清除 quarantine
+- 自动更新为“下载 + 手动覆盖安装”，无法静默替换
+
 ## v1.1.1
 
 首个可用版本，在 [jadedm/openconnect-gui](https://github.com/jadedm/openconnect-gui) 基础上二次开发。

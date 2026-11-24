@@ -6,6 +6,8 @@ const os = require('os');
 const crypto = require('crypto');
 const profileStore = require('./src/main/profiles');
 const parsers = require('./src/main/parsers');
+const routes = require('./src/main/routes');
+const updater = require('./src/main/updater');
 
 let mainWindow;
 let splashWindow;
@@ -493,6 +495,10 @@ function updateTrayMenu() {
         updateTrayMenu();
       }
     },
+    {
+      label: '检查更新',
+      click: () => checkForUpdatesManually()
+    },
     { type: 'separator' },
     {
       label: '退出',
@@ -519,6 +525,184 @@ function updateTrayMenu() {
 
   tray.setContextMenu(contextMenu);
   tray.setToolTip(`OpenConnect VPN - ${statusText}`);
+}
+
+let updateCheckInProgress = false;
+
+// 连接前清理上一网络环境遗留的主机路由（例如旧网段网关仍指向服务器 IP），
+// 否则系统会报 "Can't assign requested address" 导致连接失败
+async function prepareServerRoute(serverUrl, sudoPassword) {
+  try {
+    const result = await routes.cleanStaleServerRoute(serverUrl, sudoPassword);
+    if (!result.checked) {
+      sendLog('[警告] 无法解析服务器地址，跳过残留路由检查', 'error');
+      return true;
+    }
+    if (!result.stale) {
+      sendLog(`[调试] 未发现指向 ${result.ip} 的残留路由`, 'info');
+      return true;
+    }
+
+    sendLog(`检测到残留路由：${result.ip} → ${result.route.gateway}（${result.route.interface}）`, 'info');
+    if (result.removed) {
+      sendLog(`已删除残留路由 ${result.ip}，将按当前网络重新选路`, 'info');
+      return true;
+    }
+    if (result.incorrectPassword) {
+      sendLog('[错误] sudo 密码错误，无法清理残留路由', 'error');
+      return false;
+    }
+    sendLog(`[警告] 残留路由清理失败：${result.error || '未知错误'}`, 'error');
+    return true;
+  } catch (error) {
+    sendLog(`[警告] 检查残留路由失败：${error.message}`, 'error');
+    return true;
+  }
+}
+
+async function promptUpdate(result) {
+  const detailLines = [
+    `当前版本：v${result.currentVersion}`,
+    `最新版本：v${result.latestVersion}`
+  ];
+  const notes = String(result.notes || '').trim();
+  if (notes) {
+    const trimmed = notes.length > 800 ? `${notes.slice(0, 800)}…` : notes;
+    detailLines.push('', '更新说明：', trimmed);
+  }
+
+  const { response } = await dialog.showMessageBox({
+    type: 'info',
+    title: '发现新版本',
+    message: `发现新版本 v${result.latestVersion}`,
+    detail: detailLines.join('\n'),
+    buttons: ['稍后', '下载更新'],
+    defaultId: 1,
+    cancelId: 0
+  });
+
+  if (response !== 1) {
+    return;
+  }
+
+  await downloadUpdate(result);
+}
+
+async function downloadUpdate(result) {
+  if (!result.downloadUrl) {
+    shell.openExternal(result.releaseUrl);
+    return;
+  }
+
+  const fileName = result.downloadName || `OpenConnect VPN-${result.latestVersion}-arm64.dmg`;
+  const targetPath = path.join(app.getPath('downloads'), fileName);
+
+  if (Notification.isSupported()) {
+    new Notification({
+      title: '正在下载更新',
+      body: `v${result.latestVersion} 下载完成后会自动打开`
+    }).show();
+  }
+
+  try {
+    const downloaded = await updater.downloadFile(result.downloadUrl, targetPath);
+    const openError = await shell.openPath(downloaded.path);
+    if (openError) {
+      throw new Error(openError);
+    }
+    await dialog.showMessageBox({
+      type: 'info',
+      title: '更新已下载',
+      message: `v${result.latestVersion} 安装包已打开`,
+      detail: '将 OpenConnect VPN 拖入“应用程序”文件夹覆盖旧版本即可完成更新，随后重启应用。',
+      buttons: ['确定']
+    });
+  } catch (error) {
+    const { response } = await dialog.showMessageBox({
+      type: 'warning',
+      title: '下载更新失败',
+      message: error.message,
+      detail: '可以改为在 GitHub Releases 页面手动下载安装包。',
+      buttons: ['取消', '打开发布页'],
+      defaultId: 1,
+      cancelId: 0
+    });
+    if (response === 1) {
+      shell.openExternal(result.releaseUrl);
+    }
+  }
+}
+
+async function checkForUpdatesManually() {
+  if (updateCheckInProgress) {
+    dialog.showMessageBox({
+      type: 'info',
+      title: '检查更新',
+      message: '正在检查更新，请稍候…',
+      buttons: ['确定']
+    });
+    return;
+  }
+
+  updateCheckInProgress = true;
+  try {
+    const result = await updater.checkForUpdate(app.getVersion());
+    if (!result.updateAvailable) {
+      await dialog.showMessageBox({
+        type: 'info',
+        title: '检查更新',
+        message: '当前已是最新版本',
+        detail: `当前版本：v${result.currentVersion}`,
+        buttons: ['确定']
+      });
+      return;
+    }
+    await promptUpdate(result);
+  } catch (error) {
+    const { response } = await dialog.showMessageBox({
+      type: 'warning',
+      title: '检查更新失败',
+      message: error.message,
+      detail: '请检查网络连接后重试，或打开 GitHub Releases 页面手动查看。',
+      buttons: ['取消', '打开发布页'],
+      defaultId: 1,
+      cancelId: 0
+    });
+    if (response === 1) {
+      shell.openExternal(`https://github.com/${updater.DEFAULT_REPO}/releases`);
+    }
+  } finally {
+    updateCheckInProgress = false;
+  }
+}
+
+// 启动后静默检查：仅在有新版本时发系统通知，不打断用户
+async function checkForUpdatesSilently() {
+  if (updateCheckInProgress) {
+    return;
+  }
+
+  updateCheckInProgress = true;
+  try {
+    const result = await updater.checkForUpdate(app.getVersion());
+    if (!result.updateAvailable) {
+      return;
+    }
+    if (Notification.isSupported()) {
+      const notification = new Notification({
+        title: `发现新版本 v${result.latestVersion}`,
+        body: '点击查看并下载更新'
+      });
+      notification.on('click', () => {
+        promptUpdate(result).catch(() => {});
+      });
+      notification.show();
+    }
+  } catch (error) {
+    console.log('自动检查更新失败：', error.message);
+  } finally {
+    updateCheckInProgress = false;
+  }
 }
 
 // 启动 VPN 连接。渲染层的 IPC 调用和托盘快速连接共用同一份逻辑。
@@ -584,6 +768,13 @@ async function startConnection(config) {
       return { success: false, error: '需要 sudo 密码' };
     }
     sendLog('[调试] 已收到 sudo 密码（长度：' + sudoPassword.length + '）', 'info');
+
+    // 连接前清理残留主机路由，避免旧网络环境的路由导致连接失败
+    const routeReady = await prepareServerRoute(serverUrl, sudoPassword);
+    if (!routeReady) {
+      updateStatus('disconnected');
+      return { success: false, error: 'sudo 密码错误' };
+    }
 
     // Use expect script for proper PTY handling
     // In production, it's in extraResources; in dev, it's in project root
@@ -1280,6 +1471,13 @@ app.whenReady().then(() => {
   } else {
     // Show splash screen first
     createSplashWindow();
+  }
+
+  // 启动后静默检查更新（仅打包版），有新版本时用系统通知提示
+  if (app.isPackaged) {
+    setTimeout(() => {
+      checkForUpdatesSilently();
+    }, 8000);
   }
 
   // Don't create main window yet - wait for splash to complete
