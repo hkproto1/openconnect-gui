@@ -1,614 +1,299 @@
-# OpenConnect VPN GUI
+# OpenConnect VPN GUI（macOS 中文客户端）
 
-A modern, native macOS application for managing OpenConnect VPN connections, built with **Electron**, **React**, and **shadcn/ui**.
+基于 [jadedm/openconnect-gui](https://github.com/jadedm/openconnect-gui) 二次开发的 macOS OpenConnect 图形客户端，使用 **Electron**、**React** 与 **shadcn/ui** 构建。当前版本 **v1.2.0**，界面、日志与系统提示已全部汉化，定位为个人轻量客户端。
 
-## Screenshots
+> 本项目为个人维护的 fork，仅提供 Apple Silicon（arm64）构建。
 
-### Connection Tab
-![Connection Tab](screenshots/openconnect-vpn-1.png)
-*Multi-column layout with Connection Settings on the left and Recent Activity on the right*
+## 界面截图
 
-### Process Monitor
-![Process Monitor](screenshots/openconnect-vpn-2.png)
-*View and manage running OpenConnect processes with sudo authentication*
+> 截图为上游版本界面，当前版本已完成中文化。
 
-## Features
+### 连接页
 
-### Core VPN Management
+![连接页](screenshots/openconnect-vpn-1.png)
 
-- 🔐 **Secure VPN Connections** - Full OpenConnect support with interactive authentication
-- 💾 **Profile Management** - Save and load multiple VPN profiles with credentials
-- 🛡️ **Secure Authentication** - Expect script handles interactive prompts with proper PTY
-- 🌐 **IP Address Monitoring** - Real-time public IP display before and after connection
-- 🔔 **System Tray Integration** - Quick access from the menu bar
+左侧为连接设置，右侧为最近活动。
 
-### Advanced Features
+### 进程监控
 
-- 🧭 **Multi-Tab Interface** - Organized navigation with Connection, Logs, Diagnostics, and Processes tabs
-- 🔍 **Network Diagnostics** - Detect and fix problematic network routes that block VPN connections
-- 📊 **Process Monitor** - View and kill running OpenConnect processes system-wide with sudo authentication
-- 📝 **Comprehensive Logging** - Real-time connection logs with extensive debugging information
-- ⚡ **Lazy Loading** - Diagnostics load only when needed for better performance
+![进程监控](screenshots/openconnect-vpn-2.png)
 
-### User Experience
+查看并管理系统中运行的 OpenConnect 进程（需要 sudo 认证）。
 
-- 🎨 **Modern UI** - Beautiful interface built with shadcn/ui and Tailwind CSS
-- 🌓 **Dark Mode Support** - Seamless light/dark theme switching
-- ℹ️ **Contextual Help** - In-app descriptions and usage guides for all features
-- ⚙️ **System Checks** - Automatic dependency verification on startup
-- 📌 **Version Display** - Footer shows current app version
-- ⚡ **Fast Development** - Vite with hot module replacement
+## 功能
 
-## Installation (End Users)
+### 连接与配置
 
-### Download
+- 完整的 OpenConnect 支持，兼容 AnyConnect、GlobalProtect、Fortinet 等协议
+- 保存、加载、删除多个 VPN 配置，支持认证组、服务器证书指纹（`pin-sha256:...`）
+- 密码使用 macOS 钥匙串（`safeStorage`）加密保存，旧版明文配置首次加载时自动迁移
+- 托盘快速连接：无需打开主窗口即可使用已保存配置发起连接、断开连接
+- 开机自动启动（仅打包版，可在托盘菜单中开关），登录后后台驻留菜单栏
+- 连接状态显示、系统通知与错误提示（主窗口隐藏时同样能收到反馈）
+- 退出确认：VPN 连接中退出会先确认
 
-Download the latest `.dmg` file from [Releases](https://github.com/jadedm/openconnect-gui/releases/latest)
+### 网络诊断
 
-### Install
+- 连接前自动清理残留主机路由，修复更换网络后报 `Can't assign requested address` 的问题
+- 服务器连通性测试（`nc`）
+- 路由表与网络接口查看
+- 手动删除阻塞连接的问题路由
 
-1. Open the DMG file
-2. Drag "OpenConnect VPN" to your Applications folder
-3. **Important**: Remove quarantine attribute (app is unsigned)
+### 自动更新
 
-### ⚠️ First Launch - Bypass Security Warning
+- 应用启动后静默检查 GitHub Releases，有新版本时发送系统通知
+- 托盘菜单「检查更新」可手动检查并查看更新说明
+- 确认后自动下载 dmg 到「下载」目录并打开，拖入「应用程序」覆盖即可升级
 
-macOS will show **"OpenConnect VPN is damaged"** because the app is not code-signed.
+### 其他
 
-**Choose one method:**
+- 完整连接日志与最近活动，支持复制、清空
+- 进程监控：查看并结束系统内所有 OpenConnect 进程
+- 深色模式、上下文帮助、页脚版本号
+- 启动时自动检查 OpenConnect、expect 与 sudo 权限
 
-**Method 1: Terminal (Recommended)**
+## 安装
+
+### 下载
+
+从 [Releases](https://github.com/hkproto1/openconnect-gui/releases/latest) 下载最新 `.dmg`（当前为 `OpenConnect VPN-1.2.0-arm64.dmg`）。
+
+### 安装步骤
+
+1. 打开 dmg，将「OpenConnect VPN」拖入「应用程序」
+2. 本应用未签名，首次启动需清除隔离标记：
+
 ```bash
 xattr -cr "/Applications/OpenConnect VPN.app"
+open "/Applications/OpenConnect VPN.app"
 ```
-Then launch the app normally from Applications.
 
-**Method 2: Right-Click**
-1. Right-click (or Control+click) on "OpenConnect VPN" in Applications
-2. Click "Open"
-3. Click "Open" again in the security dialog
+也可以右键点击应用选择「打开」，在安全提示中再次确认。
 
-**You only need to do this once.** Subsequent launches will work normally.
+### 依赖
 
-### Required Dependencies
+应用会在启动时检查以下依赖：
 
-The app will verify these on first launch:
+- **OpenConnect**：`brew install openconnect`
+- **expect**：macOS 一般自带（`/usr/bin/expect`）
+- **sudo 权限**：当前用户需在管理员组
 
-- ✅ **OpenConnect** - VPN client (install with `brew install openconnect`)
-- ✅ **expect** - Terminal automation (pre-installed on macOS)
-- ✅ **Sudo access** - Required for VPN connections
+### 系统要求
 
-## Prerequisites (Development)
+- macOS 10.13 或更高
+- Apple Silicon（M1/M2/M3 等），暂未提供 Intel 构建
 
-### Required for Development
+## 升级
 
-- **Node.js 16+** and **npm**
+- **1.2.0 及以上**：启动后自动检查新版本，或从托盘菜单选择「检查更新」，确认后自动下载 dmg 并打开，拖入「应用程序」覆盖即可
+- **1.1.1 及更早**：旧版本不含更新功能，需要手动下载一次 v1.2.0
+- 由于应用未签名，更新采用「下载 + 手动覆盖」方式，不会静默替换安装
+- 首次启动会把旧版 `profiles.json` 迁移为钥匙串加密格式；迁移后旧版本将无法读取该配置
 
-  ```bash
-  brew install node
-  ```
+升级前请先退出正在运行的旧版本（连接中退出会断开 VPN）。
 
-- **OpenConnect** - VPN client
+## 使用说明
 
-  ```bash
-  brew install openconnect
-  ```
+### 连接到 VPN
 
-- **expect** - Usually pre-installed on macOS
-  ```bash
-  which expect  # Should return /usr/bin/expect
-  ```
+1. 在「连接」页填写服务器地址（如 `https://vpn.example.com:443`）、用户名、密码
+2. 按需选择协议、认证组，或填写服务器证书指纹
+3. 点击「连接」，按提示输入 macOS 管理员密码（OpenConnect 需要 sudo 权限）
+4. 状态依次变为：未连接 → 连接中 → 已连接；页头公网 IP 会自动刷新
 
-## Technology Stack
+连接前应用会自动检查并清理指向旧网段网关的残留主机路由，无需手动处理。
 
-### Core
+### 保存配置
 
-- **Electron 28** - Desktop application framework
-- **React 18** - UI library with hooks
-- **Vite 5** - Lightning-fast build tool and dev server
+填写连接信息与配置名称后点击「保存配置」。密码在保存时通过 macOS 钥匙串加密，配置文件权限为 `0600`。
 
-### UI Components
+### 托盘菜单
 
-- **shadcn/ui** - Beautiful, accessible component library
-- **Tailwind CSS** - Utility-first CSS framework
-- **Radix UI** - Unstyled, accessible component primitives
-- **Lucide React** - Icon library
+- **状态**：显示当前连接状态
+- **快速连接**：选择已保存配置直接连接
+- **断开连接**：断开当前 VPN
+- **开机自动启动**：登录后自动驻留菜单栏
+- **检查更新**：手动检查新版本
+- **退出**：连接中退出会先确认
 
-### Authentication
+### 网络诊断
 
-- **expect** - Automated interactive authentication with proper PTY handling
-- **vpn-connect.exp** - Custom expect script for OpenConnect
+「诊断」页可用于排查连接问题：
 
-## Development Setup
+1. 测试 VPN 服务器连通性
+2. 查看路由表与网络接口
+3. 问题路由以红色高亮，可输入 sudo 密码后删除
+4. 删除后自动刷新
 
-1. Clone the repository:
+### 进程监控
 
-   ```bash
-   git clone <repository-url>
-   cd openconnect-gui
-   ```
+「进程」页列出本应用、终端或其他工具启动的 OpenConnect 进程，可刷新列表或输入 sudo 密码强制结束进程。强制结束会断开对应 VPN。
 
-2. Install dependencies:
+## 开发
 
-   ```bash
-   npm install
-   ```
+### 环境准备
 
-3. Install OpenConnect:
-   ```bash
-   brew install openconnect
-   ```
-
-## Running the Application
-
-To start the application in development mode (with hot reload):
+- Node.js 22（见 `.nvmrc`，`nvm use` 即可）与 npm
+- OpenConnect：`brew install openconnect`
+- expect：`which expect` 应返回 `/usr/bin/expect`
 
 ```bash
-npm start
+git clone https://github.com/hkproto1/openconnect-gui.git
+cd openconnect-gui
+npm install
 ```
 
-This will:
-
-1. Start the Vite dev server on `http://localhost:5173`
-2. Launch Electron with React hot module replacement enabled
-3. Open the application with live reloading on code changes
-
-## Building for Distribution
-
-### Building the DMG
-
-1. **Add an icon** (optional):
-
-   ```bash
-   # Download a shield icon in .icns format
-   # Place it at: build/icon.icns
-   ```
-
-2. **Build and package**:
-
-   ```bash
-   npm run package
-   ```
-
-3. **Output**:
-   - DMG file: `dist/OpenConnect VPN-1.0.0-arm64.dmg` (Apple Silicon)
-   - Size: ~220 MB (includes Electron runtime)
-
-### Building for Intel Macs
+### 常用命令
 
 ```bash
-npx electron-builder --mac dmg --x64
+npm start        # 开发模式：Vite 开发服务器 + Electron（热更新）
+npm test         # 运行 node:test 单元测试
+npm run build    # 构建渲染层到 dist/
+npm run package  # 构建并打包 dmg 到 release/（不自动发布）
 ```
 
-### Code Signing (Optional)
+开发模式会先启动 `http://localhost:5173`，再启动 Electron 加载对应页面。
 
-To distribute outside the Mac App Store, you'll need:
+### 打包说明
 
-- Apple Developer account
-- Developer ID certificate
+- 输出目录为 `release/`，dmg 命名如 `OpenConnect VPN-1.2.0-arm64.dmg`
+- 打包脚本固定使用 `--publish never`，发布由 `gh release create` 手动执行
+- 打包白名单必须包含 `src/main/**/*`，否则安装版启动会报 `Cannot find module`
 
-The app currently builds unsigned. Users will need to right-click → Open on first launch.
-
-## Usage
-
-### Application Interface
-
-The application features a clean tab-based interface:
-
-1. **Connection** - VPN connection settings and recent activity
-2. **Logs** - Complete connection history and debugging information
-3. **Diagnostics** - Network troubleshooting and route management
-4. **Processes** - View running OpenConnect processes
-
-### Connecting to a VPN
-
-#### From the Connection Tab:
-
-1. **Enter Connection Details:**
-
-   - Server URL (e.g., `https://vpn.example.com:443`)
-   - Username
-   - Password
-   - Protocol (AnyConnect, GlobalProtect, Fortinet, etc.)
-   - Auth Group (optional)
-   - Server Certificate Pin (optional, format: `pin-sha256:...`)
-
-2. **Click Connect**
-
-   - You'll be prompted for your macOS administrator password
-   - OpenConnect requires sudo privileges to create VPN connections
-
-3. **Monitor Connection**
-   - Status badge changes: "Disconnected" → "Connecting" → "Connected"
-   - IP address updates automatically in the header (before/after connection)
-   - Recent activity shows the last 10 log entries on the right
-   - Click "View All Logs" to see complete connection history
-
-### Saving Profiles
-
-1. Fill in the connection form
-2. Enter a **Profile Name**
-3. Click **Save Profile**
-
-**⚠️ Security Warning:** Passwords are stored in plaintext in a local JSON file. For better security, leave the password field empty in saved profiles and enter it manually each time you connect.
-
-### Using Saved Profiles
-
-1. Select a profile from the dropdown menu
-2. The form will auto-fill with saved credentials
-3. Click **Connect**
-
-### Deleting Profiles
-
-1. Select a profile from the dropdown
-2. Click the trash icon (🗑️) next to the dropdown
-
-### Using Network Diagnostics
-
-The **Diagnostics** tab helps troubleshoot VPN connection issues:
-
-**Features:**
-
-- **VPN Server Connectivity** - Test if your server is reachable
-- **Network Interfaces** - View active network adapters and IPs
-- **Route Detection** - Automatically identifies problematic network routes
-- **Route Deletion** - Remove stale routes that block connections
-
-**Common Scenario:**
-If you recently switched networks (e.g., from mobile hotspot to WiFi), you may have stale routes. The diagnostics tab will highlight these in red with a "Delete" button.
-
-**To Delete a Route:**
-
-1. Navigate to the Diagnostics tab
-2. Problematic routes are highlighted in red
-3. Click "Delete" on the problematic route
-4. Enter your sudo password in the modal
-5. Route is removed and diagnostics refresh automatically
-
-### Monitoring Processes
-
-The **Processes** tab shows all OpenConnect processes:
-
-**What it shows:**
-
-- Processes started by this application
-- Processes started manually via terminal
-- Processes started by other VPN tools
-
-**How to use:**
-
-1. Click the Processes tab
-2. Processes load automatically on first visit
-3. Click "Refresh" to update the list
-4. Badge in navigation shows count of active processes
-
-**Killing Processes:**
-
-1. Click the "Kill" button next to any process
-2. Enter your sudo password in the modal
-3. Process is forcefully terminated with SIGKILL (-9)
-4. Process list automatically refreshes
-
-⚠️ **Warning**: Killing processes forcefully terminates VPN connections and may result in data loss.
-
-### Viewing Connection Logs
-
-The **Logs** tab provides comprehensive connection history:
-
-**Features:**
-
-- All OpenConnect output in real-time
-- Expect script messages prefixed with `[EXPECT]`
-- Error messages prefixed with `[ERROR]`
-- Debug information prefixed with `[DEBUG]`
-- Copy all logs to clipboard with "Copy" button
-- Clear logs with "Clear" button
-
-**Recent Activity (Connection Tab):**
-
-- Shows last 10 log entries
-- Quick view while managing connections
-- Click "View All Logs" to jump to Logs tab
-
-## File Structure
+### 项目结构
 
 ```
 openconnect-gui/
-├── main.js                      # Electron main process
-├── preload.js                   # Secure IPC bridge
-├── vpn-connect.exp              # Expect script for authentication
-├── package.json                 # Dependencies and build config
-├── vite.config.js               # Vite configuration
-├── tailwind.config.js           # Tailwind CSS config
-├── build/
-│   └── icon.icns                # App icon
-├── pages/
-│   ├── index.html               # Main window
-│   ├── splash.html              # Startup splash screen
-│   ├── installer-helper.html   # OpenConnect installer
-│   └── password-prompt.html    # Sudo password prompt
+├── main.js                      # Electron 主进程：窗口、托盘、连接、更新、IPC
+├── preload.js                   # 渲染层安全 IPC 桥
+├── vpn-connect.exp              # 交互式认证脚本（读取 0600 凭据文件）
+├── pages/                       # 各页面 HTML 入口
 ├── src/
-│   ├── App.jsx                  # Main app component with tab navigation
-│   ├── main.jsx                 # React entry point
-│   ├── globals.css              # Global styles
-│   └── components/
-│       ├── Navigation.jsx       # Tab navigation component
-│       ├── ConnectionForm.jsx   # VPN connection form
-│       ├── BasicLogs.jsx        # Recent activity (last 10 logs)
-│       ├── LogsPanel.jsx        # Full connection logs
-│       ├── DiagnosticsPanel.jsx # Network diagnostics and route management
-│       ├── ProcessMonitor.jsx   # Running processes viewer
-│       ├── RouteDeleteModal.jsx # Sudo password modal for route deletion
-│       ├── KillProcessModal.jsx # Sudo password modal for killing processes
-│       ├── Alert.jsx            # Alert notifications
-│       └── ui/                  # shadcn/ui components
-└── scripts/
-    ├── install-openconnect.sh
-    └── create-tray-icon.js
+│   ├── App.jsx                  # 主界面与标签导航
+│   ├── Splash.jsx               # 启动检查页
+│   ├── Installer.jsx            # OpenConnect 安装引导
+│   ├── PasswordPrompt.jsx       # sudo 密码输入页
+│   ├── components/              # 连接、日志、诊断、进程等组件
+│   ├── main/
+│   │   ├── profiles.js          # 配置加密读写与 v1→v2 迁移
+│   │   ├── parsers.js           # 路由表/网卡输出解析
+│   │   ├── routes.js            # 残留主机路由检测与清理
+│   │   └── updater.js           # GitHub Releases 检查与 dmg 下载
+│   └── ...
+├── test/                        # node:test 单元测试
+├── assets/                      # 应用与托盘图标
+├── scripts/                     # OpenConnect 安装脚本
+└── release/                     # 打包输出（不入库）
 ```
 
-## How It Works
+### 架构简述
 
-### Architecture
+1. **主进程**（`main.js`）：管理窗口与托盘、执行启动检查、准备凭据文件、通过 expect 启动 `sudo openconnect`、处理 IPC、检查更新
+2. **expect 脚本**（`vpn-connect.exp`）：为 OpenConnect 创建 PTY，自动应答 sudo、用户名、密码提示；凭据来自临时文件，读取后立即删除
+3. **预加载脚本**（`preload.js`）：通过上下文隔离暴露白名单 API
+4. **React 渲染层**（`src/`）：连接表单、日志、诊断、进程监控等界面
 
-1. **Main Process** (`main.js`):
+### 认证流程
 
-   - Manages Electron application lifecycle
-   - Performs startup system checks (OpenConnect, expect, sudo access)
-   - Spawns OpenConnect via expect script for proper PTY handling
-   - Handles IPC communication with React renderer
-   - Manages system tray integration
-   - Stores/loads connection profiles to `~/Library/Application Support`
+1. 用户填写连接信息并点击连接
+2. 应用弹出 sudo 密码窗口
+3. sudo 密码、VPN 用户名、VPN 密码写入权限为 `0600` 的临时文件
+4. expect 脚本读取凭据后立即删除文件，并启动 `sudo openconnect`
+5. 脚本识别 sudo、用户名、密码提示并自动应答
+6. 连接建立后刷新公网 IP，失败则给出具体错误提示
 
-2. **Expect Script** (`vpn-connect.exp`):
-
-   - Creates proper pseudo-terminal (PTY) for OpenConnect
-   - Handles interactive sudo password prompt
-   - Sends VPN username and password at correct prompts
-   - Detects authentication failures and timeouts
-   - Keeps connection alive after establishment
-
-3. **Preload Script** (`preload.js`):
-
-   - Secure IPC bridge using context isolation
-   - Exposes whitelisted APIs: `connectVPN`, `disconnectVPN`, `getStatus`, etc.
-   - Event listeners for status changes and log messages
-
-4. **React Frontend** (`src/`):
-   - Modern component-based UI with shadcn/ui and tab navigation
-   - Real-time status updates and connection logs
-   - Profile management (save/load/delete)
-   - IP address monitoring (fetches from ipify.org)
-   - Network diagnostics with route detection and management
-   - Process monitoring (shows all running OpenConnect instances)
-   - Contextual help and usage guides
-   - Dark mode support
-
-### Authentication Flow
-
-1. User enters credentials and clicks Connect
-2. App prompts for sudo password (macOS dialog)
-3. Expect script spawns `sudo openconnect` with credentials
-4. Script detects and handles prompts:
-   - Sudo password → Sends sudo password
-   - Username prompt → Sends VPN username
-   - Password prompt → Sends VPN password
-5. Connection established or error reported
-6. IP address refreshed to show new VPN IP
-
-### Network Diagnostics Flow
-
-1. User navigates to Diagnostics tab (lazy loads on first visit)
-2. App fetches network information:
-   - Routing table (`netstat -rn`)
-   - Network interfaces (`ifconfig`)
-   - VPN server connectivity test (`nc -zv`)
-3. Routes are analyzed for problems:
-   - Gateway IPs that don't match current network interfaces
-   - Routes pointing to unreachable private networks
-   - Stale routes from previous VPN connections or network changes
-4. Problematic routes highlighted in red with "Delete" button
-5. User clicks "Delete" → Modal prompts for sudo password
-6. Route deleted via `sudo route delete <destination>`
-7. Diagnostics automatically refresh to show updated routes
-
-### Security Considerations
-
-- ✅ **Context Isolation** - Renderer can't access Node.js directly
-- ✅ **IPC Whitelisting** - Only approved APIs exposed
-- ✅ **Input Validation** - All user inputs validated before use in system commands
-- ✅ **Command Injection Prevention** - PID, route destinations, and network parameters strictly validated
-- ✅ **Sudo Authentication** - Passwords passed securely via stdin, user prompted each time
-- ✅ **Proper PTY** - Expect script prevents credential leakage in logs
-- ✅ **Safe Command Execution** - Uses `spawn()` with argument arrays instead of shell string interpolation
-- ⚠️ **Password Storage** - Stored in plaintext JSON (consider macOS Keychain for production)
-
-## Troubleshooting
-
-### System Check Failures
-
-The app performs startup checks for:
-
-- **OpenConnect** - Install with `brew install openconnect`
-- **expect** - Should be pre-installed at `/usr/bin/expect`
-- **Sudo access** - User must be in admin group
-
-### Connection Issues
-
-**"Incorrect sudo password" error:**
-
-- Verify you're entering your macOS login password
-- Check logs for `[EXPECT ERROR]` messages
-
-**"VPN authentication failed":**
-
-- Verify VPN username and password
-- Check server URL format (e.g., `https://vpn.example.com:443`)
-- Confirm server certificate pin if using `--servercert`
-
-**"Failed to connect" or "Can't assign requested address":**
-
-- This is often caused by stale network routes
-- Go to the **Diagnostics** tab
-- Look for routes highlighted in red (problematic routes)
-- Click "Delete" on problematic routes and enter your sudo password
-- Common example: Route to `172.20.10.1` when you're not on that network anymore
-
-**Connection succeeds but no internet:**
-
-- Check logs for vpnc-script errors
-- Route configuration may have failed but tunnel is established
-- Use the Diagnostics tab to verify your routes
-- Try manual route: `sudo route add -net 0.0.0.0/0 <gateway>`
-
-**"expect script not found" in production:**
-
-- The DMG build should include vpn-connect.exp in extraResources
-- Check: `/Applications/OpenConnect VPN.app/Contents/Resources/vpn-connect.exp`
-
-### Stale VPN Processes
-
-If the **Processes** tab shows unexpected OpenConnect processes:
-
-**Option 1: Via App UI (Recommended)**
-
-1. Go to the **Processes** tab
-2. Click the **Kill** button next to the process you want to terminate
-3. Enter your sudo password in the modal
-4. Process will be forcefully terminated and list will refresh
-
-**Option 2: Via Terminal**
+### 测试
 
 ```bash
-# View all OpenConnect processes
-ps aux | grep openconnect | grep -v grep
-
-# Kill specific process by PID
-sudo kill -9 <PID>
-
-# Or kill all OpenConnect processes
-sudo pkill -9 openconnect
+npm test
 ```
 
-**Option 3: System Monitor**
+覆盖路由表/网卡解析、残留路由判定、版本比较与更新检查逻辑。GitHub Actions 会在 macOS 上执行测试与前端构建。
 
-- Open Activity Monitor
-- Search for "openconnect"
-- Force quit the process
+## 安全说明
 
-### App Won't Open on macOS
+- 渲染层启用上下文隔离，仅通过 `preload.js` 暴露白名单 IPC
+- 所有系统命令使用 `spawn()` 与参数数组，避免命令注入；PID、路由目标、端口等均做格式校验
+- 配置密码通过 macOS 钥匙串加密（`safeStorage`），文件权限 `0600`，写入采用临时文件 + 原子替换
+- sudo 密码与 VPN 密码不再出现在进程命令行（`ps aux` 不可见），改为临时凭据文件
+- 已知限制：应用未签名/未公证，请仅从本仓库 Releases 下载
 
-**"OpenConnect VPN is damaged" error:**
+## 常见问题
 
-- App is not code-signed
-- Right-click → Open (first launch only)
-- Or: `xattr -cr "/Applications/OpenConnect VPN.app"`
+### 更换网络后连接失败，日志出现 `Can't assign requested address`
 
-## Data Storage
+v1.2.0 起会在连接前自动清理指向旧网段网关的残留主机路由。若仍失败：
 
-Connection profiles are stored in:
+1. 打开「诊断」页，查看服务器 IP 是否存在异常主机路由
+2. 删除红色高亮的问题路由后重试
+3. 也可在终端执行 `sudo route delete <服务器IP>` 后重新连接
+
+### sudo 密码错误或 VPN 认证失败
+
+- sudo 密码为 macOS 登录密码，需当前用户在管理员组
+- VPN 认证失败请检查用户名、密码、认证组与服务器地址
+- 使用证书指纹时确认 `pin-sha256:` 值正确
+
+### 连接成功但无法上网
+
+- 查看日志中的 vpnc-script 报错信息
+- 隧道可能已建立但路由配置失败，可在「诊断」页检查路由
+- 必要时执行 `sudo route add -net 0.0.0.0/0 <网关>`
+
+### 启动提示「已损坏」或无法打开
+
+应用未签名，首次启动需清除隔离标记：
+
+```bash
+xattr -cr "/Applications/OpenConnect VPN.app"
+```
+
+### 存在残留 OpenConnect 进程
+
+在「进程」页结束对应进程，或使用终端：
+
+```bash
+ps aux | grep openconnect | grep -v grep
+sudo kill -9 <PID>
+```
+
+### 检查更新失败
+
+- 确认网络可访问 `api.github.com`
+- GitHub API 未认证请求存在频率限制，稍后重试
+- 也可直接打开 [Releases](https://github.com/hkproto1/openconnect-gui/releases) 手动下载
+
+## 数据存储
+
+配置保存在：
 
 ```
 ~/Library/Application Support/openconnect-gui/profiles.json
 ```
 
-This file contains usernames, passwords, and server information in plaintext. Protect this file accordingly.
+v2 格式仅保存非敏感字段与钥匙串加密后的密码。钥匙串密钥与当前用户/系统绑定，换机或重装系统后需要重新输入密码。
 
-## Development
+## 已知限制
 
-### Debug Mode
+- 仅提供 arm64 构建
+- 未签名/未公证，首次启动需手动清除 quarantine
+- 自动更新为「下载 + 手动覆盖安装」，无法静默替换
+- 暂不支持证书客户端认证、MFA 的图形化配置（可在终端使用 openconnect 完成）
+- 暂未提供 Intel 构建
 
-To open the developer tools:
+## 后续计划
 
-- macOS: `Cmd + Option + I`
-- Or add `mainWindow.webContents.openDevTools();` to `main.js`
+- 自动重连与网络变化检测
+- 证书认证、MFA 支持
+- Intel（x64）构建
+- 配置导入/导出（加密）
 
-### Logs
+## 许可证
 
-Application logs from the main process are visible in the terminal where you ran `npm start`.
+MIT，详见 [LICENSE](LICENSE)。
 
-## Known Limitations
+上游项目：[jadedm/openconnect-gui](https://github.com/jadedm/openconnect-gui)，作者 [Manish Jadhav](https://manishj.com)。
 
-- ⚠️ **Password Storage** - Passwords stored in plaintext JSON
-- ⚠️ **macOS Only** - Designed for macOS (expect script, sudo dialogs)
-- ⚠️ **Unsigned App** - Requires right-click → Open on first launch
-- ⚠️ **Username/Password Only** - Certificate auth not yet supported
-- ⚠️ **No Auto-Reconnect** - Must manually reconnect if VPN drops
+## 反馈
 
-## Completed Features
-
-### Core Functionality
-
-- ✅ Expect script for proper interactive authentication
-- ✅ Real-time IP address monitoring
-- ✅ Profile management with local storage
-- ✅ System dependency checks on startup
-- ✅ System tray integration
-
-### User Interface
-
-- ✅ Multi-tab navigation (Connection, Logs, Diagnostics, Processes)
-- ✅ Modern UI with shadcn/ui and Tailwind CSS
-- ✅ Dark mode support
-- ✅ Contextual help and usage guides
-- ✅ Consistent icon system across all components
-
-### Advanced Features
-
-- ✅ Network diagnostics with route detection
-- ✅ Automatic problematic route identification
-- ✅ Sudo-authenticated route deletion from UI
-- ✅ Process monitoring and detection (separate tab)
-- ✅ Process killing with sudo authentication
-- ✅ Command injection prevention with input validation
-- ✅ Extensive error logging with context-aware messages
-- ✅ Lazy loading for performance optimization
-- ✅ Recent activity quick view (last 10 logs)
-
-## Future Enhancements
-
-### Security
-
-- [ ] macOS Keychain integration for secure password storage
-- [ ] Certificate-based authentication support
-- [ ] Multi-factor authentication (MFA/2FA) support
-- [ ] Import/export profiles (encrypted)
-
-### Connectivity
-
-- [ ] Auto-reconnect on disconnect with configurable retry
-- [ ] Network change detection and automatic reconnection
-- [ ] Connection speed/data usage monitoring
-- [ ] Multiple simultaneous VPN connections
-- [ ] Custom vpnc-script support
-- [ ] Split tunneling configuration
-
-### Diagnostics
-
-- [ ] Automatic route repair suggestions
-- [ ] DNS leak testing
-- [ ] Network speed testing while connected
-- [ ] MTU optimization recommendations
-- [ ] VPN server latency monitoring
-
-### User Experience
-
-- [ ] Connection history with timestamps
-- [ ] Favorite/pinned profiles
-- [ ] Quick connect from system tray
-- [ ] Notification center integration
-- [ ] Keyboard shortcuts
-
-## License
-
-MIT
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
----
-
-**Built by [Manish Jadhav](https://manishj.com)**, engineer & technical consultant.
-
-Need something like this designed or built? [Inoltro](https://inoltro.ai) is my studio.
+欢迎提交 Issue 或 Pull Request：https://github.com/hkproto1/openconnect-gui/issues

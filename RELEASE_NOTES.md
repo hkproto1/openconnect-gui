@@ -94,109 +94,106 @@ open "/Applications/OpenConnect VPN.app"
 
 ---
 
-# OpenConnect VPN GUI v1.0.0（上游版本）
+# 上游版本 v1.0.0（jadedm/openconnect-gui）
 
-Native macOS application for managing OpenConnect VPN connections with advanced network diagnostics and process monitoring.
+macOS 原生 OpenConnect VPN 图形客户端，支持网络诊断与进程监控。
 
-## ✨ Features
+## 功能
 
-### Core VPN Management
-- 🔐 Secure VPN connections with interactive authentication
-- 💾 Profile management - Save and load multiple VPN profiles with credentials
-- 🌐 Real-time public IP address monitoring
-- 🔔 System tray integration for quick access
+### 核心 VPN 管理
 
-### Advanced Features
-- 🧭 **Multi-Tab Interface** - Organized navigation (Connection, Logs, Diagnostics, Processes)
-- 🔍 **Network Diagnostics** - Detect and fix problematic routes that block VPN connections
-- 📊 **Process Monitor** - View and kill running OpenConnect processes with sudo authentication
-- 📝 **Comprehensive Logging** - Real-time connection logs with extensive debugging
-- ⚡ **Lazy Loading** - Diagnostics load only when needed for better performance
+- 安全 VPN 连接，支持交互式认证
+- 配置管理：保存并加载多个带凭据的 VPN 配置
+- 实时公网 IP 监控
+- 系统托盘集成，菜单栏快速访问
 
-### User Experience
-- 🎨 Modern UI built with shadcn/ui and Tailwind CSS
-- 🌓 Dark mode support
-- ℹ️ Contextual help in all tabs
-- 📌 Version display in footer
+### 高级功能
 
-## 📦 Installation
+- **多标签界面**：连接、日志、诊断、进程分区导航
+- **网络诊断**：检测并修复阻塞 VPN 连接的问题路由
+- **进程监控**：通过 sudo 认证查看并结束运行中的 OpenConnect 进程
+- **完整日志**：实时连接日志与详细调试信息
+- **懒加载**：诊断页按需加载，减少开销
 
-### 1. Download
-Download `OpenConnect-VPN-1.0.0-arm64.dmg` below (for Apple Silicon Macs: M1/M2/M3)
+### 使用体验
 
-### 2. Install
-1. Open the DMG file
-2. Drag "OpenConnect VPN" to Applications folder
+- 基于 shadcn/ui 与 Tailwind CSS 的现代界面
+- 深色模式
+- 各标签页内置上下文帮助
+- 页脚显示版本号
 
-### 3. ⚠️ Important: First Launch
+## 安装
 
-macOS will show **"OpenConnect VPN is damaged"** because the app is **not code-signed**.
+下载 `OpenConnect-VPN-1.0.0-arm64.dmg`（适用于 Apple Silicon：M1/M2/M3），打开后将「OpenConnect VPN」拖入「应用程序」。
 
-**Choose one method to bypass the warning:**
+应用未签名，首次启动会被提示「已损坏」，可任选一种方式处理：
 
-**Method 1: Terminal (Recommended)**
+**方式一：终端（推荐）**
+
 ```bash
 xattr -cr "/Applications/OpenConnect VPN.app"
 ```
-Then launch the app normally.
 
-**Method 2: Right-Click**
-1. Right-click on "OpenConnect VPN" in Applications
-2. Click "Open"
-3. Click "Open" again in the security dialog
+**方式二：右键打开**
 
-**You only need to do this once.** Subsequent launches will work normally.
+1. 在「应用程序」中右键（或 Control + 点击）应用
+2. 选择「打开」
+3. 在安全提示中再次点击「打开」
 
-## ⚙️ Requirements
+只需处理一次，后续启动正常。
 
-- **macOS**: 10.13 or later
-- **Architecture**: Apple Silicon (M1/M2/M3)
-- **OpenConnect**: Install with `brew install openconnect`
-- **expect**: Pre-installed on macOS
+## 环境要求
 
-## 🔒 Security
+- macOS 10.13 或更高
+- Apple Silicon（M1/M2/M3）
+- OpenConnect：`brew install openconnect`
+- expect：macOS 自带
 
-- ✅ Input validation and command injection prevention
-- ✅ Sudo-authenticated privileged operations
-- ✅ Context isolation for renderer process
-- ✅ Safe command execution using spawn with argument arrays
-- ⚠️ Passwords stored in plaintext JSON locally (consider using macOS Keychain)
+## 安全
 
-## 📸 Screenshots
+- 输入校验与命令注入防护
+- 通过 sudo 认证执行特权操作
+- 渲染进程上下文隔离
+- 使用 `spawn` + 参数数组执行命令
+- 注意：上游版本将密码以明文 JSON 保存在本地（本 fork 已改为钥匙串加密）
 
-See [README](https://github.com/jadedm/openconnect-gui#screenshots) for screenshots and full documentation.
+## 截图
 
-## 🐛 Known Issues
+见上游 [README](https://github.com/jadedm/openconnect-gui#screenshots)。
 
-- App is unsigned (requires manual security bypass on first launch)
-- Intel Mac build not included in this release
-- Password storage uses plaintext JSON (macOS Keychain integration planned)
+## 已知问题
 
-## 📝 Full Changelog
+- 应用未签名，首次启动需手动绕过安全提示
+- 该版本未提供 Intel 构建
+- 密码以明文 JSON 存储（当时计划接入 macOS 钥匙串）
 
-### Added
-- Multi-tab navigation interface
-- Network diagnostics panel with route detection
-- Automatic problematic route identification
-- Sudo-authenticated route deletion from UI
-- Process monitoring and management
-- Process killing with sudo authentication
-- Recent activity panel (last 10 logs)
-- Lazy loading for diagnostics tab
-- Comprehensive error handling and logging
-- Security hardening with input validation
-- Dark mode support throughout
-- Contextual help sections
-- Footer with version number
-- Screenshots in documentation
+## 变更记录
 
-### Security
-- Command injection prevention for PID, routes, and connectivity tests
-- Input validation for all system commands
-- Safe command execution patterns
+### 新增
+
+- 多标签导航界面
+- 网络诊断面板与路由检测
+- 自动识别问题路由
+- 在界面中通过 sudo 删除路由
+- 进程监控与管理
+- 通过 sudo 结束进程
+- 最近活动面板（最近 10 条日志）
+- 诊断页懒加载
+- 完整的错误处理与日志
+- 输入校验安全加固
+- 全局深色模式
+- 上下文帮助
+- 页脚版本号
+- 文档截图
+
+### 安全
+
+- 针对 PID、路由、连通性测试的命令注入防护
+- 所有系统命令输入校验
+- 安全的命令执行方式
 
 ---
 
-**Support**: Report issues at https://github.com/jadedm/openconnect-gui/issues
+**问题反馈**：https://github.com/jadedm/openconnect-gui/issues
 
-**License**: MIT
+**许可证**：MIT

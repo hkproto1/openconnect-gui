@@ -1,4 +1,4 @@
-name: CI
+name: 持续集成
 
 on:
   push:
@@ -8,22 +8,23 @@ on:
 
 jobs:
   build-and-test:
+    name: 构建与测试
     runs-on: macos-latest
     steps:
-      - name: Checkout
+      - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: 配置 Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
+      - name: 安装依赖
         run: npm ci
 
-      - name: Run unit tests
+      - name: 运行单元测试
         run: npm test
 
-      - name: Build renderer
+      - name: 构建渲染层
         run: npm run build
