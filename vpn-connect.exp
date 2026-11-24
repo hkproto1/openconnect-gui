@@ -29,7 +29,10 @@ puts "\[EXPECT\] 等待 sudo 密码提示…"
 expect {
     "Password:" {
         puts "\[EXPECT\] 检测到 sudo 密码提示，正在发送密码…"
+        # 临时关闭回显，避免密码被 PTY 回显到日志
+        log_user 0
         send "$sudo_password\r"
+        log_user 1
         exp_continue
     }
     "Sorry, try again" {
@@ -62,7 +65,9 @@ puts "\[EXPECT\] 等待 VPN 密码提示…"
 expect {
     -re "(Please enter your password|Password:)" {
         puts "\[EXPECT\] 检测到 VPN 密码提示，正在发送密码…"
+        log_user 0
         send "$vpn_password\r"
+        log_user 1
     }
     timeout {
         puts "\[EXPECT ERROR\] 超时：等待 VPN 密码提示"

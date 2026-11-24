@@ -1,6 +1,6 @@
 # OpenConnect VPN GUI（macOS 中文客户端）
 
-基于 [jadedm/openconnect-gui](https://github.com/jadedm/openconnect-gui) 二次开发的 macOS OpenConnect 图形客户端，使用 **Electron**、**React** 与 **shadcn/ui** 构建。当前版本 **v1.2.0**，界面、日志与系统提示已全部汉化，定位为个人轻量客户端。
+基于 [jadedm/openconnect-gui](https://github.com/jadedm/openconnect-gui) 二次开发的 macOS OpenConnect 图形客户端，使用 **Electron**、**React** 与 **shadcn/ui** 构建。当前版本 **v1.3.0**，界面、日志与系统提示已全部汉化，定位为个人轻量客户端。
 
 > 本项目为个人维护的 fork，仅提供 Apple Silicon（arm64）构建。
 
@@ -47,7 +47,9 @@
 
 ### 其他
 
-- 完整连接日志与最近活动，支持复制、清空
+- 连接日志按级别着色，支持错误 / 警告 / 流程筛选、复制与清空
+- 连接前自动探测服务器 TCP 连通性，失败时给出具体原因与路由信息
+- 主界面「关于」：查看当前版本、检查更新、阅读更新说明并下载安装包
 - 进程监控：查看并结束系统内所有 OpenConnect 进程
 - 深色模式、上下文帮助、页脚版本号
 - 启动时自动检查 OpenConnect、expect 与 sudo 权限
@@ -56,7 +58,7 @@
 
 ### 下载
 
-从 [Releases](https://github.com/hkproto1/openconnect-gui/releases/latest) 下载最新 `.dmg`（当前为 `OpenConnect VPN-1.2.0-arm64.dmg`）。
+从 [Releases](https://github.com/hkproto1/openconnect-gui/releases/latest) 下载最新 `.dmg`（当前为 `OpenConnect VPN-1.3.0-arm64.dmg`）。
 
 ### 安装步骤
 
@@ -85,8 +87,8 @@ open "/Applications/OpenConnect VPN.app"
 
 ## 升级
 
-- **1.2.0 及以上**：启动后自动检查新版本，或从托盘菜单选择「检查更新」，确认后自动下载 dmg 并打开，拖入「应用程序」覆盖即可
-- **1.1.1 及更早**：旧版本不含更新功能，需要手动下载一次 v1.2.0
+- **1.2.0 及以上**：启动后自动检查新版本，或从托盘菜单 / 主界面「关于」选择「检查更新」，确认后自动下载 dmg 并打开，拖入「应用程序」覆盖即可
+- **1.1.1 及更早**：旧版本不含更新功能，需要手动下载一次最新版本
 - 由于应用未签名，更新采用「下载 + 手动覆盖」方式，不会静默替换安装
 - 首次启动会把旧版 `profiles.json` 迁移为钥匙串加密格式；迁移后旧版本将无法读取该配置
 
@@ -156,7 +158,7 @@ npm run package  # 构建并打包 dmg 到 release/（不自动发布）
 
 ### 打包说明
 
-- 输出目录为 `release/`，dmg 命名如 `OpenConnect VPN-1.2.0-arm64.dmg`
+- 输出目录为 `release/`，dmg 命名如 `OpenConnect VPN-1.3.0-arm64.dmg`
 - 打包脚本固定使用 `--publish never`，发布由 `gh release create` 手动执行
 - 打包白名单必须包含 `src/main/**/*`，否则安装版启动会报 `Cannot find module`
 
@@ -222,7 +224,7 @@ npm test
 
 ### 更换网络后连接失败，日志出现 `Can't assign requested address`
 
-v1.2.0 起会在连接前自动清理指向旧网段网关的残留主机路由。若仍失败：
+v1.2.0 起会在连接前自动清理指向旧网段网关的残留主机路由。若仍失败，v1.3.0 起的日志会输出服务器当前路由、默认网关与残留路由详情（含删除命令），可直接按「建议」行处理：
 
 1. 打开「诊断」页，查看服务器 IP 是否存在异常主机路由
 2. 删除红色高亮的问题路由后重试

@@ -6,6 +6,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Application metadata
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
 
+  // Update checks and external links
+  checkForUpdate: () => ipcRenderer.invoke('check-for-update'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
+
   // VPN connection methods
   connectVPN: (config) => ipcRenderer.invoke('connect-vpn', config),
   disconnectVPN: () => ipcRenderer.invoke('disconnect-vpn'),

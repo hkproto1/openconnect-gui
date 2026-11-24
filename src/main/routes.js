@@ -32,9 +32,19 @@ function ipv4FromNetworkInterfaces(interfaces) {
   return addresses;
 }
 
+// 查找指向服务器 IP 的主机路由
+function findHostRoute(routes, hostIp) {
+  return (routes || []).find((item) => item.destination === hostIp) || null;
+}
+
+// 查找默认路由，用于日志中说明当前出口网关
+function findDefaultRoute(routes) {
+  return (routes || []).find((item) => item.destination === 'default') || null;
+}
+
 // 找出指向服务器 IP、但网关不在当前网段的残留主机路由
 function findStaleHostRoute(routes, hostIp, addresses) {
-  const route = (routes || []).find((item) => item.destination === hostIp);
+  const route = findHostRoute(routes, hostIp);
   if (!route) return null;
   if (String(route.gateway).startsWith('link#')) return null;
   if (!isPrivateGateway(route.gateway)) return null;
@@ -115,31 +125,28 @@ function deleteHostRoute(destination, sudoPassword) {
   });
 }
 
-// 连接前调用：解析服务器地址，必要时删除阻塞连接的残留主机路由
-async function cleanStaleServerRoute(serverUrl, sudoPassword) {
+// 检查服务器地址、当前路由、本机地址与残留路由，供连接前后诊断使用
+async function inspectServerRoute(serverUrl) {
   const host = extractHost(serverUrl);
   const ip = await resolveHostIPv4(host);
   if (!ip) {
-    return { checked: false, resolved: false };
+    return { checked: false, resolved: false, host };
   }
 
-  const routes = await readRoutingTable();
+  const table = await readRoutingTable();
   const addresses = ipv4FromNetworkInterfaces(os.networkInterfaces());
-  const staleRoute = findStaleHostRoute(routes, ip, addresses);
+  const existingRoute = findHostRoute(table, ip);
+  const defaultRoute = findDefaultRoute(table);
 
-  if (!staleRoute) {
-    return { checked: true, ip, stale: false, removed: false };
-  }
-
-  const result = await deleteHostRoute(ip, sudoPassword);
   return {
     checked: true,
+    resolved: true,
+    host,
     ip,
-    stale: true,
-    removed: result.success,
-    route: staleRoute,
-    error: result.error,
-    incorrectPassword: result.incorrectPassword
+    addresses,
+    existingRoute,
+    defaultRoute,
+    staleRoute: findStaleHostRoute(table, ip, addresses)
   };
 }
 
@@ -147,7 +154,10 @@ module.exports = {
   isPrivateGateway,
   ipv4FromNetworkInterfaces,
   isGatewayInCurrentNetwork,
+  findHostRoute,
+  findDefaultRoute,
   findStaleHostRoute,
   extractHost,
-  cleanStaleServerRoute
+  inspectServerRoute,
+  deleteHostRoute
 };

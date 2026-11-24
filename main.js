@@ -528,37 +528,265 @@ function updateTrayMenu() {
 }
 
 let updateCheckInProgress = false;
+let updateDownloadInProgress = false;
 let updateNotification = null;
 
-// 连接前清理上一网络环境遗留的主机路由（例如旧网段网关仍指向服务器 IP），
-// 否则系统会报 "Can't assign requested address" 导致连接失败
+// 连接前检查上一网络环境遗留的主机路由（例如旧网段网关仍指向服务器 IP），
+// 否则系统会报 "Can't assign requested address" 导致连接失败。
+// 每一步都会写入日志，便于用户直接看出失败原因。
 async function prepareServerRoute(serverUrl, sudoPassword) {
-  try {
-    const result = await routes.cleanStaleServerRoute(serverUrl, sudoPassword);
-    if (!result.checked) {
-      sendLog('[警告] 无法解析服务器地址，跳过残留路由检查', 'error');
-      return true;
-    }
-    if (!result.stale) {
-      sendLog(`[调试] 未发现指向 ${result.ip} 的残留路由`, 'info');
-      return true;
-    }
+  sendLog('[步骤] 检查服务器地址与残留主机路由', 'step');
 
-    sendLog(`检测到残留路由：${result.ip} → ${result.route.gateway}（${result.route.interface}）`, 'info');
-    if (result.removed) {
-      sendLog(`已删除残留路由 ${result.ip}，将按当前网络重新选路`, 'info');
-      return true;
-    }
-    if (result.incorrectPassword) {
-      sendLog('[错误] sudo 密码错误，无法清理残留路由', 'error');
-      return false;
-    }
-    sendLog(`[警告] 残留路由清理失败：${result.error || '未知错误'}`, 'error');
-    return true;
+  let info;
+  try {
+    info = await routes.inspectServerRoute(serverUrl);
   } catch (error) {
-    sendLog(`[警告] 检查残留路由失败：${error.message}`, 'error');
+    sendLog(`[警告] 读取路由表失败：${error.message}`, 'warn');
+    sendLog('[提示] 跳过残留路由检查，继续尝试连接', 'warn');
     return true;
   }
+
+  if (!info.resolved) {
+    sendLog(`[警告] 无法解析服务器地址「${info.host || serverUrl}」，跳过残留路由检查`, 'warn');
+    return true;
+  }
+
+  sendLog(`[网络] 服务器 ${info.host} → ${info.ip}`, 'info');
+  sendLog(
+    info.addresses.length
+      ? `[网络] 本机 IPv4 地址：${info.addresses.join('、')}`
+      : '[网络] 未检测到本机 IPv4 地址',
+    'info'
+  );
+
+  if (info.defaultRoute) {
+    sendLog(`[路由] 默认网关：${info.defaultRoute.gateway}（${info.defaultRoute.interface}）`, 'route');
+  }
+
+  if (info.existingRoute) {
+    const flags = info.existingRoute.flags ? `，flags ${info.existingRoute.flags}` : '';
+    sendLog(
+      `[路由] 服务器当前主机路由：${info.existingRoute.gateway}（${info.existingRoute.interface}${flags}）`,
+      'route'
+    );
+  } else {
+    sendLog('[路由] 未发现服务器主机路由，将按默认网关选路', 'info');
+  }
+
+  if (!info.staleRoute) {
+    sendLog('[路由] 未发现旧网络遗留的残留路由', 'success');
+    return true;
+  }
+
+  sendLog(
+    `[警告] 检测到残留主机路由：${info.ip} → ${info.staleRoute.gateway}（${info.staleRoute.interface}），该网关不属于当前网段`,
+    'warn'
+  );
+  sendLog('[路由] 正在删除残留路由…', 'step');
+
+  let result;
+  try {
+    result = await routes.deleteHostRoute(info.ip, sudoPassword);
+  } catch (error) {
+    sendLog(`[错误] 删除残留路由失败：${error.message}`, 'error');
+    return true;
+  }
+
+  if (result.success) {
+    sendLog(`[成功] 已删除残留路由 ${info.ip}，将按当前网络重新选路`, 'success');
+    const after = await routes.inspectServerRoute(serverUrl).catch(() => null);
+    if (after && after.staleRoute) {
+      sendLog('[警告] 删除后仍检测到残留路由，连接可能继续受影响', 'warn');
+    }
+    return true;
+  }
+
+  if (result.incorrectPassword) {
+    sendLog('[错误] sudo 密码错误，无法清理残留路由，已停止连接', 'error');
+    return false;
+  }
+
+  sendLog(`[错误] 残留路由删除失败：${result.error || '未知错误'}`, 'error');
+  sendLog('[建议] 请打开「网络诊断」页手动删除该路由，或确认 sudo 权限后重试', 'warn');
+  return true;
+}
+
+function parseServerEndpoint(serverUrl) {
+  const host = routes.extractHost(serverUrl);
+  let port = 443;
+  try {
+    const normalized = /^https?:\/\//.test(serverUrl) ? serverUrl : `https://${serverUrl}`;
+    const url = new URL(normalized);
+    if (url.port) {
+      port = parseInt(url.port, 10);
+    } else if (url.protocol === 'http:') {
+      port = 80;
+    }
+  } catch {
+    // 地址不合法时保持默认端口，后续连接阶段会给出具体错误
+  }
+  return { host, port };
+}
+
+// 连接前用 nc 探测服务器 TCP 端口，提前暴露网络/路由问题
+function testTcpConnectivity(host, port, timeout = 5000) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let output = '';
+    let timer = null;
+
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(result);
+    };
+
+    const child = spawn('nc', ['-zv', '-G', '5', host, String(port)], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    child.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    child.stderr.on('data', (data) => {
+      output += data.toString();
+    });
+    child.on('close', (code) => {
+      const success = code === 0 && /succeeded|open/i.test(output);
+      finish({
+        success,
+        code,
+        message: output.trim() || `退出码 ${code}`
+      });
+    });
+    child.on('error', (error) => {
+      finish({ success: false, message: error.message });
+    });
+
+    timer = setTimeout(() => {
+      if (!child.killed) {
+        child.kill();
+      }
+      finish({ success: false, message: '连接超时' });
+    }, timeout);
+  });
+}
+
+// 判定 OpenConnect 单行输出的日志级别
+function classifyOutputLine(line) {
+  if (line.includes('[EXPECT ERROR]')) return 'error';
+  if (/CONNECTED|Established|Configured as/.test(line)) return 'success';
+  if (/WARNING|Warning|warning/i.test(line)) return 'warn';
+  if (/error|failed|failure|denied|refused|unreachable|no route|cannot|can't|timed out|incorrect|invalid/i.test(line)) {
+    return 'error';
+  }
+  return 'info';
+}
+
+// 将 OpenConnect 的多行输出拆成逐行日志，避免一大段文本难以阅读
+function logProcessOutput(output) {
+  for (const rawLine of String(output).split('\n')) {
+    const line = rawLine.replace(/\r$/, '').trimEnd();
+    if (!line.trim()) continue;
+    sendLog(line, classifyOutputLine(line));
+  }
+}
+
+// 连接失败后根据输出、探测结果与当前路由表给出可执行的诊断结论
+async function buildFailureDiagnosis({ exitCode, output, probe, serverUrl, sudoAuthError, vpnAuthError }) {
+  const text = [String(output || ''), probe?.message || ''].filter(Boolean).join('\n');
+  const endpoint = parseServerEndpoint(serverUrl);
+  const entries = [];
+  const push = (type, message) => entries.push({ type, message });
+
+  let routeInfo = null;
+  try {
+    routeInfo = await routes.inspectServerRoute(serverUrl);
+  } catch {
+    // 路由表读取失败时不影响其他诊断
+  }
+
+  const assignAddress = /Can't assign requested address/i.test(text);
+  const refused = /Connection refused/i.test(text);
+  const timedOut = /timed out|Operation timed out|Connection timed out/i.test(text);
+  const connectionFailed = /Failed to connect|Failed to open|connection failed/i.test(text);
+  const tlsFailure = /TLS handshake failed|SSL error|certificate verify failed|servercert.*(invalid|mismatch)|certificate.*(invalid|expired|not trusted)/i.test(text);
+
+  push('error', `[诊断] OpenConnect 进程已退出，退出码 ${exitCode}`);
+
+  if (probe && !probe.success) {
+    push('warn', `[网络] 连接前 TCP 探测失败：${probe.message}`);
+  }
+
+  let headline = '连接失败，请查看日志中的诊断信息';
+
+  if (sudoAuthError) {
+    headline = 'sudo 密码错误，连接未建立';
+    push('error', '[原因] sudo 密码错误，OpenConnect 无法获得管理员权限');
+    push('warn', '[建议] 重新输入 macOS 管理员密码后重试');
+  } else if (vpnAuthError) {
+    headline = 'VPN 认证失败，请检查用户名或密码';
+    push('error', '[原因] VPN 认证失败：用户名或密码不正确，或认证组、协议不匹配');
+    push('warn', '[建议] 检查用户名、密码、认证组与协议设置');
+  } else if (assignAddress) {
+    headline = '连接失败：本机路由异常，无法为服务器分配出口';
+    push('error', '[原因] 系统无法为服务器分配有效出口（Can\'t assign requested address）');
+    if (routeInfo && routeInfo.staleRoute) {
+      push('error', `[诊断] 检测到残留主机路由：${routeInfo.ip} → ${routeInfo.staleRoute.gateway}（${routeInfo.staleRoute.interface}）`);
+      push('warn', `[建议] 打开「网络诊断」页删除 ${routeInfo.ip} 的主机路由，或执行 sudo route delete ${routeInfo.ip}`);
+    } else {
+      push('warn', '[建议] 打开「网络诊断」页检查服务器 IP 的路由，必要时重启网络接口后重试');
+    }
+  } else if (refused) {
+    headline = '连接失败：服务器拒绝连接';
+    push('error', `[原因] ${endpoint.host}:${endpoint.port} 拒绝连接，端口未开放或被防火墙拦截`);
+    push('warn', '[建议] 确认服务器地址与端口是否正确，或更换网络后重试');
+  } else if (timedOut) {
+    headline = '连接失败：连接超时';
+    if (routeInfo && routeInfo.staleRoute) {
+      push('error', `[诊断] 检测到残留主机路由：${routeInfo.ip} → ${routeInfo.staleRoute.gateway}（${routeInfo.staleRoute.interface}）`);
+      push('error', '[原因] 超时可能由旧网络遗留的路由导致，当前网络无法通过该网关访问服务器');
+      push('warn', `[建议] 打开「网络诊断」页删除 ${routeInfo.ip} 的主机路由后重试`);
+    } else {
+      push('error', `[原因] 连接 ${endpoint.host}:${endpoint.port} 超时，可能是网络不可达、防火墙或路由问题`);
+      push('warn', '[建议] 检查本机网络与服务器状态，或打开「网络诊断」页测试连通性');
+    }
+  } else if (connectionFailed) {
+    headline = '连接失败：无法与服务器建立 TCP 连接';
+    push('error', `[原因] 无法连接 ${endpoint.host}:${endpoint.port}，可能是网络不可达、服务器未开放或被防火墙拦截`);
+    if (routeInfo && routeInfo.staleRoute) {
+      push('error', `[诊断] 检测到残留主机路由：${routeInfo.ip} → ${routeInfo.staleRoute.gateway}（${routeInfo.staleRoute.interface}）`);
+      push('warn', `[建议] 打开「网络诊断」页删除 ${routeInfo.ip} 的主机路由后重试`);
+    } else {
+      push('warn', '[建议] 打开「网络诊断」页测试服务器连通性，或更换网络后重试');
+    }
+  } else if (tlsFailure) {
+    headline = '连接失败：TLS/证书握手失败';
+    push('error', '[原因] TLS 或证书握手失败，可能是服务器证书指纹不匹配或被代理拦截');
+    push('warn', '[建议] 检查「服务器证书」指纹是否正确，或临时清空该字段重试');
+  } else {
+    push('error', '[原因] 连接未能建立，日志中没有明确的认证失败信息');
+    push('warn', '[建议] 展开日志查看 OpenConnect 原始输出；若出现 Can\'t assign requested address，请到「网络诊断」页清理残留路由');
+  }
+
+  // 无论何种原因，只要当前仍有残留路由，都单独提示
+  if (routeInfo && routeInfo.staleRoute && !assignAddress && !timedOut && !connectionFailed) {
+    push('error', `[诊断] 复查发现残留主机路由：${routeInfo.ip} → ${routeInfo.staleRoute.gateway}（${routeInfo.staleRoute.interface}），建议一并清理`);
+    push('warn', `[建议] 打开「网络诊断」页删除 ${routeInfo.ip} 的主机路由后重试`);
+  }
+
+  if (routeInfo && routeInfo.ip) {
+    const current = routeInfo.existingRoute
+      ? `${routeInfo.existingRoute.gateway}（${routeInfo.existingRoute.interface}）`
+      : '无主机路由，将使用默认网关';
+    push('info', `[路由] 服务器 ${routeInfo.ip} 当前路由：${current}`);
+    if (routeInfo.defaultRoute) {
+      push('info', `[路由] 默认网关：${routeInfo.defaultRoute.gateway}（${routeInfo.defaultRoute.interface}）`);
+    }
+  }
+
+  return { entries, headline };
 }
 
 async function promptUpdate(result) {
@@ -759,23 +987,38 @@ async function startConnection(config) {
     args.push('--verbose'); // More detailed logging
 
     // Log the command being executed (without password)
-    sendLog(`执行命令：sudo openconnect ${args.join(' ')}`, 'info');
+    sendLog('[步骤] 准备连接参数', 'step');
+    sendLog(`[信息] 服务器：${serverUrl}`, 'info');
+    sendLog(`[信息] 协议：${protocol}${config.authgroup ? `，认证组：${config.authgroup}` : ''}`, 'info');
+    sendLog(`[信息] OpenConnect：${openconnectPath}`, 'info');
+    sendLog(`[调试] 执行命令：sudo openconnect ${args.join(' ')}`, 'debug');
 
     // Request sudo password from user
-    sendLog('[调试] 正在弹出 sudo 密码输入框…', 'info');
+    sendLog('[步骤] 请求 macOS 管理员密码', 'step');
     const sudoPassword = await promptForSudoPassword();
     if (!sudoPassword) {
       sendLog('[错误] 用户未提供 sudo 密码', 'error');
       updateStatus('disconnected');
       return { success: false, error: '需要 sudo 密码' };
     }
-    sendLog('[调试] 已收到 sudo 密码（长度：' + sudoPassword.length + '）', 'info');
+    sendLog('[调试] 已收到 sudo 密码', 'debug');
 
     // 连接前清理残留主机路由，避免旧网络环境的路由导致连接失败
     const routeReady = await prepareServerRoute(serverUrl, sudoPassword);
     if (!routeReady) {
       updateStatus('disconnected');
       return { success: false, error: 'sudo 密码错误' };
+    }
+
+    // 提前探测服务器端口，让网络/路由问题在日志中直接可见
+    const endpoint = parseServerEndpoint(serverUrl);
+    sendLog(`[步骤] 测试服务器 TCP 连通性 ${endpoint.host}:${endpoint.port}`, 'step');
+    const probe = await testTcpConnectivity(endpoint.host, endpoint.port, 5000);
+    if (probe.success) {
+      sendLog(`[网络] ${endpoint.host}:${endpoint.port} TCP 可达`, 'success');
+    } else {
+      sendLog(`[警告] ${endpoint.host}:${endpoint.port} TCP 不可达：${probe.message}`, 'warn');
+      sendLog('[提示] 仍会继续尝试建立 VPN；若失败请查看下方诊断结论', 'warn');
     }
 
     // Use expect script for proper PTY handling
@@ -810,8 +1053,17 @@ async function startConnection(config) {
       }
     };
 
-    sendLog('[调试] 使用 expect 脚本进行交互式认证', 'info');
-    sendLog(`[调试] Expect 脚本路径：${expectScriptPath}`, 'info');
+    sendLog('[步骤] 启动 OpenConnect 进程', 'step');
+    sendLog(`[调试] Expect 脚本路径：${expectScriptPath}`, 'debug');
+
+    const connectionStartedAt = Date.now();
+    let outputBuffer = '';
+    const recordOutput = (text) => {
+      outputBuffer += text;
+      if (outputBuffer.length > 20000) {
+        outputBuffer = outputBuffer.slice(-20000);
+      }
+    };
 
     const sudoProcess = spawn('expect', expectArgs, {
       stdio: ['pipe', 'pipe', 'pipe']
@@ -821,84 +1073,85 @@ async function startConnection(config) {
 
     // Track connection status
     let connected = false;
-    let authError = false;
+    let sudoAuthError = false;
+    let vpnAuthError = false;
+
+    // expect 的 puts 与 OpenConnect 输出都走 stdout，认证标记需要两个流都检查
+    const updateAuthFlags = (output) => {
+      if (output.includes('[EXPECT ERROR] 密码错误')) {
+        sudoAuthError = true;
+        sendLog('[错误] sudo 密码认证失败', 'error');
+      }
+      if (output.includes('[EXPECT ERROR] VPN 认证失败')) {
+        vpnAuthError = true;
+        sendLog('[错误] VPN 账号或密码不正确', 'error');
+      }
+      if (output.includes('[EXPECT ERROR] 超时')) {
+        sendLog('[错误] 认证或连接超时', 'error');
+      }
+    };
 
     // Handle stdout
     sudoProcess.stdout.on('data', (data) => {
       const output = data.toString();
-      sendLog(output);
+      recordOutput(output);
+      logProcessOutput(output);
+      updateAuthFlags(output);
 
       if ((output.includes('CONNECTED') || output.includes('Established') || output.includes('Configured as')) && !connected) {
         connected = true;
         updateStatus('connected');
-        sendLog('连接建立成功！', 'info');
+        sendLog(`[成功] VPN 连接已建立（耗时 ${Math.round((Date.now() - connectionStartedAt) / 1000)} 秒）`, 'success');
       }
     });
 
     // Handle stderr - this is where OpenConnect output appears
     sudoProcess.stderr.on('data', (data) => {
       const output = data.toString();
-      sendLog(output);
-
-      // Check for sudo password errors
-      if (output.includes('[EXPECT ERROR] 密码错误')) {
-        authError = true;
-        sendLog('[错误] sudo 密码认证失败！', 'error');
-      }
-
-      // Check for VPN authentication errors
-      if (output.includes('[EXPECT ERROR] VPN 认证失败')) {
-        authError = true;
-        sendLog('[错误] VPN 账号或密码不正确！', 'error');
-      }
-
-      // Check for timeout errors
-      if (output.includes('[EXPECT ERROR] 超时')) {
-        authError = true;
-        sendLog('[错误] 连接超时', 'error');
-      }
+      recordOutput(output);
+      logProcessOutput(output);
+      updateAuthFlags(output);
 
       if ((output.includes('CONNECTED') || output.includes('Established') || output.includes('Configured as')) && !connected) {
         connected = true;
         updateStatus('connected');
-        sendLog('连接建立成功！', 'info');
+        sendLog(`[成功] VPN 连接已建立（耗时 ${Math.round((Date.now() - connectionStartedAt) / 1000)} 秒）`, 'success');
       }
 
       // Ignore vpnc-script errors (connection still works)
       if (output.includes('is not a recognized network service') || output.includes('Error: The parameters were not valid')) {
-        sendLog('提示：路由配置有报错，但 VPN 隧道已建立', 'info');
+        sendLog('[警告] 路由脚本报错，但 VPN 隧道可能已建立', 'warn');
       }
     });
 
     // Handle process exit
-    sudoProcess.on('close', (code) => {
+    sudoProcess.on('close', async (code) => {
       removeCredsFile();
-      const exitTime = new Date().toLocaleTimeString();
-      sendLog(`[调试] OpenConnect 进程已退出，退出码 ${code}，时间 ${exitTime}`);
+      const duration = Math.round((Date.now() - connectionStartedAt) / 1000);
+      sendLog(`[调试] OpenConnect 进程已退出，退出码 ${code}，连接持续 ${duration} 秒`, 'debug');
 
       openconnectProcess = null;
       updateStatus('disconnected');
 
       if (code !== 0 && code !== null) {
-        let errorMessage = `连接已关闭，退出码 ${code}`;
-
-        // Provide specific error messages based on context
-        if (authError) {
-          if (code === 1) {
-            errorMessage = '认证失败，请检查用户名和密码。';
-          }
-        } else if (code === 1) {
-          errorMessage = '连接失败，可能是 sudo 密码错误或网络问题。';
+        const diagnosis = await buildFailureDiagnosis({
+          exitCode: code,
+          output: outputBuffer,
+          probe,
+          serverUrl,
+          sudoAuthError,
+          vpnAuthError
+        });
+        for (const entry of diagnosis.entries) {
+          sendLog(entry.message, entry.type);
         }
-
-        sendLog(`[错误] ${errorMessage}`, 'error');
-        notifyConnectionError(errorMessage);
+        notifyConnectionError(diagnosis.headline);
       } else if (code === 0 && connected) {
         // Clean exit while connected - this is unexpected
-        sendLog(`[警告] VPN 意外断开，可能原因：`, 'error');
-        sendLog(`  - 网络中断或超时`, 'error');
-        sendLog(`  - 服务端主动断开（空闲超时、策略限制等）`, 'error');
-        sendLog(`  - MTU/DTLS 相关问题`, 'error');
+        sendLog('[警告] VPN 意外断开，可能原因：', 'warn');
+        sendLog('[警告] - 网络中断或超时', 'warn');
+        sendLog('[警告] - 服务端主动断开（空闲超时、策略限制等）', 'warn');
+        sendLog('[警告] - MTU/DTLS 相关问题', 'warn');
 
         notifyConnectionError('VPN 已断开，请查看日志获取详情。');
       }
@@ -966,6 +1219,50 @@ ipcMain.handle('get-status', async () => {
 // Get application version (single source of truth: package.json / Info.plist)
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
+});
+
+// 渲染层「关于」页：检查更新
+ipcMain.handle('check-for-update', async () => {
+  try {
+    const result = await updater.checkForUpdate(app.getVersion());
+    return { success: true, ...result };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 渲染层「关于」页：下载并打开更新安装包（下载完成后由系统通知/弹窗反馈）
+ipcMain.handle('download-update', async () => {
+  if (updateDownloadInProgress) {
+    return { success: false, error: '正在下载更新，请稍候' };
+  }
+
+  try {
+    const result = await updater.checkForUpdate(app.getVersion());
+    if (!result.updateAvailable) {
+      return { success: false, error: '当前已是最新版本' };
+    }
+
+    updateDownloadInProgress = true;
+    downloadUpdate(result)
+      .catch(() => {})
+      .finally(() => {
+        updateDownloadInProgress = false;
+      });
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 仅允许打开 GitHub 与作者站点链接，避免渲染层打开任意地址
+ipcMain.handle('open-external', async (event, url) => {
+  const value = String(url || '');
+  if (!/^https:\/\/(github\.com|manishj\.com)\//.test(value)) {
+    return { success: false, error: '不允许打开该链接' };
+  }
+  await shell.openExternal(value);
+  return { success: true };
 });
 
 // Save profiles (passwords encrypted via the OS keychain when available)

@@ -270,7 +270,7 @@ function ConnectionForm({
               value={formData.password}
               onChange={handleInputChange}
             />
-            <p className="text-xs text-muted-foreground">⚠️ 注意：密码会以明文形式保存在本地</p>
+            <p className="text-xs text-muted-foreground">密码保存时使用 macOS 钥匙串加密</p>
           </div>
 
           <div className="space-y-2">

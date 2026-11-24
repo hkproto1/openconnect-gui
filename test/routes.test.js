@@ -14,6 +14,17 @@ test('isPrivateGateway 只识别私网网关', () => {
   assert.strictEqual(routes.isPrivateGateway(''), false);
 });
 
+test('findHostRoute 与 findDefaultRoute 返回对应路由', () => {
+  const table = [
+    { destination: 'default', gateway: '10.143.231.89', flags: 'UGScg', interface: 'en0' },
+    { destination: '178.94.14.180', gateway: '10.151.116.101', flags: 'UGHS', interface: 'utun4' }
+  ];
+  assert.strictEqual(routes.findHostRoute(table, '178.94.14.180').interface, 'utun4');
+  assert.strictEqual(routes.findHostRoute(table, '203.0.113.7'), null);
+  assert.strictEqual(routes.findDefaultRoute(table).gateway, '10.143.231.89');
+  assert.strictEqual(routes.findDefaultRoute([]), null);
+});
+
 test('findStaleHostRoute 识别指向旧网段网关的残留路由', () => {
   const table = [
     { destination: 'default', gateway: '10.143.231.89', flags: 'UGScg', interface: 'en0' },

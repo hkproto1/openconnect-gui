@@ -6,7 +6,10 @@ import ProcessMonitor from './components/ProcessMonitor';
 import BasicLogs from './components/BasicLogs';
 import Navigation from './components/Navigation';
 import Alert from './components/Alert';
+import AboutDialog from './components/AboutDialog';
 import { Badge } from './components/ui/badge';
+import { Button } from './components/ui/button';
+import { Info } from 'lucide-react';
 
 const statusLabels = {
   disconnected: '未连接',
@@ -26,6 +29,7 @@ function App() {
   const [problematicRoutesCount, setProblematicRoutesCount] = useState(0);
   const [runningProcessesCount, setRunningProcessesCount] = useState(0);
   const [appVersion, setAppVersion] = useState('');
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   useEffect(() => {
     // Initialize the app
@@ -156,6 +160,10 @@ function App() {
           <Badge variant={currentStatus === 'connected' ? 'default' : currentStatus === 'connecting' ? 'secondary' : 'outline'}>
             {statusLabels[currentStatus] || currentStatus}
           </Badge>
+          <Button variant="ghost" size="sm" onClick={() => setAboutOpen(true)}>
+            <Info className="mr-1.5 h-4 w-4" />
+            关于
+          </Button>
         </div>
       </header>
 
@@ -215,6 +223,13 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* About Dialog */}
+      <AboutDialog
+        open={aboutOpen}
+        onClose={() => setAboutOpen(false)}
+        appVersion={appVersion}
+      />
 
       {/* Alert Box */}
       <Alert alert={alert} hideAlert={hideAlert} />
