@@ -528,6 +528,7 @@ function updateTrayMenu() {
 }
 
 let updateCheckInProgress = false;
+let updateNotification = null;
 
 // 连接前清理上一网络环境遗留的主机路由（例如旧网段网关仍指向服务器 IP），
 // 否则系统会报 "Can't assign requested address" 导致连接失败
@@ -689,14 +690,15 @@ async function checkForUpdatesSilently() {
       return;
     }
     if (Notification.isSupported()) {
-      const notification = new Notification({
+      // 保留引用，避免 Notification 被回收后点击回调失效
+      updateNotification = new Notification({
         title: `发现新版本 v${result.latestVersion}`,
         body: '点击查看并下载更新'
       });
-      notification.on('click', () => {
+      updateNotification.on('click', () => {
         promptUpdate(result).catch(() => {});
       });
-      notification.show();
+      updateNotification.show();
     }
   } catch (error) {
     console.log('自动检查更新失败：', error.message);
