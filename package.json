@@ -7,7 +7,7 @@
     "postinstall": "node scripts/create-tray-icon.js",
     "dev": "vite",
     "build": "vite build",
-    "test": "node --test test/",
+    "test": "node --test test/*.test.js",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173/pages/index.html && electron .\"",
     "electron:build": "vite build && electron-builder --publish never",
