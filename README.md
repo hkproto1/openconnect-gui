@@ -1,6 +1,6 @@
 # OpenConnect VPN GUI（macOS 中文客户端）
 
-基于 [jadedm/openconnect-gui](https://github.com/jadedm/openconnect-gui) 二次开发的 macOS OpenConnect 图形客户端，使用 **Electron**、**React** 与 **shadcn/ui** 构建。当前版本 **v1.3.0**，界面、日志与系统提示已全部汉化，定位为个人轻量客户端。
+基于 [jadedm/openconnect-gui](https://github.com/jadedm/openconnect-gui) 二次开发的 macOS OpenConnect 图形客户端，使用 **Electron**、**React** 与 **shadcn/ui** 构建。当前版本 **v1.4.0**，界面、日志与系统提示已全部汉化，定位为个人轻量客户端。
 
 > 本项目为个人维护的 fork，仅提供 Apple Silicon（arm64）构建。
 
@@ -39,6 +39,13 @@
 - 路由表与网络接口查看
 - 手动删除阻塞连接的问题路由
 
+### 网速监控与测速
+
+- 实时显示 VPN 隧道与物理网卡的下载 / 上传速率，带 60 秒趋势图与峰值
+- 显示默认路由、VPN 接口与本次打开页面以来的累计流量
+- 内置国际节点（Cloudflare）测速：延迟、下载、上传
+- 测速结果按「直连 / VPN 全隧道 / VPN 分流」分别保存，方便对比本地带宽与 VPN 速度
+
 ### 自动更新
 
 - 应用启动后静默检查 GitHub Releases，有新版本时发送系统通知
@@ -58,7 +65,7 @@
 
 ### 下载
 
-从 [Releases](https://github.com/hkproto1/openconnect-gui/releases/latest) 下载最新 `.dmg`（当前为 `OpenConnect VPN-1.3.0-arm64.dmg`）。
+从 [Releases](https://github.com/hkproto1/openconnect-gui/releases/latest) 下载最新 `.dmg`（当前为 `OpenConnect VPN-1.4.0-arm64.dmg`）。
 
 ### 安装步骤
 
@@ -127,6 +134,17 @@ open "/Applications/OpenConnect VPN.app"
 3. 问题路由以红色高亮，可输入 sudo 密码后删除
 4. 删除后自动刷新
 
+### 网速监控与测速
+
+「网速」页用于判断慢在本地还是 VPN：
+
+1. 连接 VPN 后查看 VPN 隧道的实时下载 / 上传速率与 60 秒趋势
+2. 在同一节点下分别测速：
+   - 先断开 VPN 点「开始测速」，得到本地直连基线
+   - 连接 VPN 后再测一次，结果自动按「直连 / VPN」保存
+3. 对比历史表中的下载、上传与延迟差值
+4. 测速节点为 `speed.cloudflare.com`，属于国际链路；分流模式下测速可能走物理网卡，页面会提示
+
 ### 进程监控
 
 「进程」页列出本应用、终端或其他工具启动的 OpenConnect 进程，可刷新列表或输入 sudo 密码强制结束进程。强制结束会断开对应 VPN。
@@ -158,7 +176,7 @@ npm run package  # 构建并打包 dmg 到 release/（不自动发布）
 
 ### 打包说明
 
-- 输出目录为 `release/`，dmg 命名如 `OpenConnect VPN-1.3.0-arm64.dmg`
+- 输出目录为 `release/`，dmg 命名如 `OpenConnect VPN-1.4.0-arm64.dmg`
 - 打包脚本固定使用 `--publish never`，发布由 `gh release create` 手动执行
 - 打包白名单必须包含 `src/main/**/*`，否则安装版启动会报 `Cannot find module`
 
@@ -175,10 +193,12 @@ openconnect-gui/
 │   ├── Splash.jsx               # 启动检查页
 │   ├── Installer.jsx            # OpenConnect 安装引导
 │   ├── PasswordPrompt.jsx       # sudo 密码输入页
-│   ├── components/              # 连接、日志、诊断、进程等组件
+│   ├── components/              # 连接、日志、诊断、网速、进程等组件
 │   ├── main/
 │   │   ├── profiles.js          # 配置加密读写与 v1→v2 迁移
 │   │   ├── parsers.js           # 路由表/网卡输出解析
+│   │   ├── netstats.js          # 接口流量解析与 VPN 接口判定
+│   │   ├── speedtest.js         # Cloudflare 延迟/上下行测速
 │   │   ├── routes.js            # 残留主机路由检测与清理
 │   │   └── updater.js           # GitHub Releases 检查与 dmg 下载
 │   └── ...

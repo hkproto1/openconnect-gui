@@ -3,6 +3,7 @@ import ConnectionForm from './components/ConnectionForm';
 import LogsPanel from './components/LogsPanel';
 import DiagnosticsPanel from './components/DiagnosticsPanel';
 import ProcessMonitor from './components/ProcessMonitor';
+import NetworkSpeed from './components/NetworkSpeed';
 import BasicLogs from './components/BasicLogs';
 import Navigation from './components/Navigation';
 import Alert from './components/Alert';
@@ -214,6 +215,12 @@ function App() {
               onProblematicRoutesChange={setProblematicRoutesCount}
               isActive={currentView === 'diagnostics'}
             />
+          </div>
+        )}
+
+        {currentView === 'speed' && (
+          <div className="px-6 py-6">
+            <NetworkSpeed isActive={currentView === 'speed'} />
           </div>
         )}
 

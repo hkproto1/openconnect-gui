@@ -1,4 +1,4 @@
-import { Network, ScrollText, Activity, ListChecks } from 'lucide-react';
+import { Network, ScrollText, Activity, ListChecks, Gauge } from 'lucide-react';
 import { Badge } from './ui/badge';
 
 function Navigation({ currentView, onViewChange, problematicRoutesCount, runningProcessesCount }) {
@@ -6,6 +6,7 @@ function Navigation({ currentView, onViewChange, problematicRoutesCount, running
     { id: 'connection', label: '连接', icon: Network },
     { id: 'logs', label: '日志', icon: ScrollText },
     { id: 'diagnostics', label: '网络诊断', icon: Activity, badge: problematicRoutesCount },
+    { id: 'speed', label: '网速', icon: Gauge },
     { id: 'processes', label: '进程', icon: ListChecks, badge: runningProcessesCount },
   ];
 

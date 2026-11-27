@@ -31,6 +31,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteRoute: (destination, sudoPassword) => ipcRenderer.invoke('delete-route', destination, sudoPassword),
   getNetworkInterfaces: () => ipcRenderer.invoke('get-network-interfaces'),
 
+  // Network speed
+  getNetworkStats: () => ipcRenderer.invoke('get-network-stats'),
+  runSpeedTest: () => ipcRenderer.invoke('run-speed-test'),
+  onSpeedTestProgress: (callback) => {
+    const listener = (event, data) => callback(data);
+    ipcRenderer.on('speed-test-progress', listener);
+    return () => ipcRenderer.removeListener('speed-test-progress', listener);
+  },
+
   // Event listeners
   onStatusChanged: (callback) => {
     ipcRenderer.on('status-changed', (event, status) => callback(status));

@@ -1,5 +1,49 @@
 # OpenConnect VPN GUI（hkproto1 fork）
 
+## v1.4.0
+
+### 新增
+
+- 「网速」标签页，用于判断是本地带宽不足还是 VPN 速度慢：
+  - 实时显示 VPN 隧道的下载 / 上传速率，带 60 秒趋势图与峰值
+  - 同时显示物理网卡速率与本次打开页面以来的累计流量
+  - 显示 VPN 接口、物理接口、默认路由与线路模式（全隧道 / 分流）
+  - 国际节点测速（Cloudflare）：延迟、下载、上传，测速过程显示进度
+  - 测速结果按「直连 / VPN 全隧道 / VPN 分流」分别保存，方便对比同一节点下的差异
+- 分流模式下会提示测速流量可能走物理网卡，避免误判 VPN 隧道速度
+
+### 工程
+
+- 新增 `src/main/netstats.js`（接口流量解析与 VPN 接口判定）与 `src/main/speedtest.js`（延迟/上下行测速）
+- 新增 `node:test` 用例覆盖 netstat 输出解析、VPN 接口选择与线路模式判定，测试总数增至 25 条
+
+### 使用建议
+
+1. 断开 VPN，在「网速」页点「开始测速」，得到本地直连基线
+2. 连接 VPN 后再测一次
+3. 对比历史表中的下载、上传与延迟：若直连也慢，说明本地带宽/国际出口受限；若只有 VPN 明显变慢，则问题在 VPN 链路
+
+### 安装（Apple Silicon）
+
+1. 下载 `OpenConnect VPN-1.4.0-arm64.dmg`
+2. 将应用拖入 `/Applications`
+3. 本包未签名，首次启动需清除隔离标记：
+
+```bash
+xattr -cr "/Applications/OpenConnect VPN.app"
+open "/Applications/OpenConnect VPN.app"
+```
+
+4. 依赖本机已安装 OpenConnect：`brew install openconnect`
+5. 「开机自动启动」需要应用保持固定在 `/Applications`；移动应用后需重新勾选
+
+### 已知限制
+
+- 仅提供 arm64 构建
+- 未签名/未公证，首次启动需手动清除 quarantine
+- 自动更新为“下载 + 手动覆盖安装”，无法静默替换
+- 测速节点为国际链路（Cloudflare），结果受国际出口影响；分流模式下不能代表 VPN 隧道速度
+
 ## v1.3.0
 
 > 重点修复：连接失败时不再笼统提示「可能是管理员密码错误」，日志会直接给出路由/网络/认证层面的具体结论。

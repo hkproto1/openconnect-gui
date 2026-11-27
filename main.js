@@ -7,6 +7,8 @@ const crypto = require('crypto');
 const profileStore = require('./src/main/profiles');
 const parsers = require('./src/main/parsers');
 const routes = require('./src/main/routes');
+const netstats = require('./src/main/netstats');
+const speedtest = require('./src/main/speedtest');
 const updater = require('./src/main/updater');
 
 let mainWindow;
@@ -789,6 +791,111 @@ async function buildFailureDiagnosis({ exitCode, output, probe, serverUrl, sudoA
   return { entries, headline };
 }
 
+let speedTestInProgress = false;
+
+function execOutput(command) {
+  return new Promise((resolve, reject) => {
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error((stderr || error.message).trim()));
+        return;
+      }
+      resolve(stdout);
+    });
+  });
+}
+
+// 读取各接口累计字节数与当前 VPN/物理接口，渲染层按 1 秒间隔计算速率
+async function readNetworkStats() {
+  const [netstatOut, routeOut, ifconfigOut] = await Promise.all([
+    execOutput('netstat -ib'),
+    execOutput('netstat -rn'),
+    execOutput('ifconfig')
+  ]);
+
+  const counters = netstats.parseInterfaceCounters(netstatOut);
+  const routeTable = parsers.parseRoutes(routeOut);
+  const interfaces = parsers.parseNetworkInterfaces(ifconfigOut);
+  const defaultRoute = routes.findDefaultRoute(routeTable);
+  const vpnInterface = netstats.selectVpnInterface(interfaces, routeTable, counters);
+  const primaryInterface = defaultRoute ? defaultRoute.interface : null;
+  const ipMap = new Map(interfaces.map((item) => [item.name, item.ip]));
+
+  return {
+    success: true,
+    timestamp: Date.now(),
+    connectionStatus,
+    vpnInterface,
+    primaryInterface,
+    defaultRoute: defaultRoute
+      ? { gateway: defaultRoute.gateway, interface: defaultRoute.interface }
+      : null,
+    route: netstats.describeRoute({ connectionStatus, vpnInterface, defaultRoute }),
+    interfaces: counters.map((counter) => ({
+      name: counter.name,
+      ip: ipMap.get(counter.name) || null,
+      ibytes: counter.ibytes,
+      obytes: counter.obytes,
+      isVpn: counter.name === vpnInterface,
+      isPrimary: counter.name === primaryInterface
+    }))
+  };
+}
+
+async function runSpeedTest(progress) {
+  const snapshot = await readNetworkStats();
+  const route = netstats.describeRoute({
+    connectionStatus: snapshot.connectionStatus,
+    vpnInterface: snapshot.vpnInterface,
+    defaultRoute: snapshot.defaultRoute
+  });
+
+  progress({ phase: 'latency', message: '正在测试国际节点延迟…' });
+  let latencyMs = null;
+  try {
+    const latency = await speedtest.measureLatency();
+    latencyMs = latency.latencyMs;
+  } catch {
+    latencyMs = null;
+  }
+
+  progress({ phase: 'download', received: 0, total: speedtest.SPEED_TEST_DOWNLOAD_BYTES });
+  const download = await speedtest.measureDownloadSpeed(speedtest.SPEED_TEST_DOWNLOAD_BYTES, progress);
+
+  let upload = null;
+  let uploadError = null;
+  progress({ phase: 'upload', sent: 0, total: speedtest.SPEED_TEST_UPLOAD_BYTES });
+  try {
+    upload = await speedtest.measureUploadSpeed(speedtest.SPEED_TEST_UPLOAD_BYTES);
+    progress({ phase: 'upload', sent: speedtest.SPEED_TEST_UPLOAD_BYTES, total: speedtest.SPEED_TEST_UPLOAD_BYTES });
+  } catch (error) {
+    uploadError = error.message;
+  }
+
+  const downloadMbps = download.seconds > 0
+    ? (download.bytes * 8) / download.seconds / 1e6
+    : null;
+  const uploadMbps = upload && upload.seconds > 0
+    ? (upload.bytes * 8) / upload.seconds / 1e6
+    : null;
+
+  return {
+    success: true,
+    mode: route.mode,
+    routeLabel: route.label,
+    routeInterface: route.interface,
+    vpnInterface: snapshot.vpnInterface,
+    latencyMs,
+    downloadMbps,
+    uploadMbps,
+    downloadBytes: download.bytes,
+    uploadBytes: upload ? upload.bytes : 0,
+    downloadPartial: download.partial,
+    uploadError,
+    timestamp: Date.now()
+  };
+}
+
 async function promptUpdate(result) {
   const detailLines = [
     `当前版本：v${result.currentVersion}`,
@@ -1427,6 +1534,37 @@ ipcMain.handle('get-routes', async () => {
       resolve({ success: true, routes: parsers.parseRoutes(stdout) });
     });
   });
+});
+
+// 网速：读取各接口累计字节数与当前 VPN/物理接口
+ipcMain.handle('get-network-stats', async () => {
+  try {
+    return await readNetworkStats();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 网速：通过国际节点测量延迟与上下行吞吐
+ipcMain.handle('run-speed-test', async (event) => {
+  if (speedTestInProgress) {
+    return { success: false, error: '测速正在进行中，请稍候' };
+  }
+
+  speedTestInProgress = true;
+  const sendProgress = (data) => {
+    if (!event.sender.isDestroyed()) {
+      event.sender.send('speed-test-progress', data);
+    }
+  };
+
+  try {
+    return await runSpeedTest(sendProgress);
+  } catch (error) {
+    return { success: false, error: error.message };
+  } finally {
+    speedTestInProgress = false;
+  }
 });
 
 // Network diagnostics: Test connectivity to a host
